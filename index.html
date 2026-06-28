@@ -736,7 +736,8 @@
 
   <script>
     const CLOUD_FUNCTION_URL = "https://1311686407-cg9lh2w33z.ap-guangzhou.tencentscf.com";
-    const PDF_SIGN_CACHE_VERSION = "inline-v2";
+    const PDF_SIGN_CACHE_VERSION = "pdfjs-v1";
+    const PDFJS_VIEWER_PATH = "pdfjs/web/viewer.html";
 
     const providerConfig = {
       deepseek: { baseUrl: "https://api.deepseek.com/v1/chat/completions", model: "deepseek-chat" },
@@ -1337,7 +1338,7 @@
       }
       try {
         const url = await getPaperReadUrl(paper);
-        window.open(url, "_blank", "noopener");
+        window.open(pdfJsViewerUrl(url), "_blank", "noopener");
       } catch (error) {
         alert("PDF 阅读链接生成失败：" + error.message);
       }
@@ -1355,7 +1356,8 @@
       body.innerHTML = `<div class="notice" style="margin:16px;">正在生成 PDF 临时阅读链接...</div>`;
       try {
         const url = await getPaperReadUrl(paper);
-        body.innerHTML = `<div class="preview-actions"><a class="btn primary" href="${escapeHtml(url)}" target="_blank" rel="noopener">新窗口打开PDF</a><span class="hint">临时链接约1小时有效；若下方空白，请用新窗口打开。</span></div><iframe class="pdf-frame" src="${escapeHtml(url)}#toolbar=1" title="${escapeHtml(paper.title)}"></iframe>`;
+        const viewerUrl = pdfJsViewerUrl(url);
+        body.innerHTML = `<div class="preview-actions"><a class="btn primary" href="${escapeHtml(viewerUrl)}" target="_blank" rel="noopener">新窗口阅读</a><a class="btn" href="${escapeHtml(url)}" target="_blank" rel="noopener">原始PDF链接</a><span class="hint">使用仓库内 PDF.js 阅读器；若下方空白，请用新窗口阅读。</span></div><iframe class="pdf-frame" src="${escapeHtml(viewerUrl)}" title="${escapeHtml(paper.title)}"></iframe>`;
       } catch (error) {
         body.innerHTML = `<div class="notice warn" style="margin:16px;">PDF 阅读链接生成失败：${escapeHtml(error.message)}。请确认云函数已部署最新 index.js，且 COS_SECRET_ID / COS_SECRET_KEY 对该桶有 GetObject 权限。</div>`;
       }
@@ -1369,6 +1371,10 @@
       const url = result.url;
       localStorage.setItem(cacheKey, JSON.stringify({ url, expiresAt: Date.now() + 50 * 60 * 1000 }));
       return url;
+    }
+
+    function pdfJsViewerUrl(pdfUrl) {
+      return `${PDFJS_VIEWER_PATH}?file=${encodeURIComponent(pdfUrl)}`;
     }
 
     function wireFloatingPreview() {
