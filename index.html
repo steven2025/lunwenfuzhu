@@ -555,10 +555,10 @@
     }
 
     .floating-body { overflow: auto; background: #f8fafc; }
-    .floating-body iframe { width: 100%; height: 100%; border: 0; background: #fff; }
-    .pdf-frame { height: calc(100% - 44px) !important; display: block; }
-    .floating-body object { width: 100%; height: calc(100% - 44px); border: 0; background: #fff; display: block; }
-    .preview-actions { display: flex; gap: 8px; align-items: center; padding: 8px; background: #eef4ff; border-bottom: 1px solid var(--line); }
+    .preview-actions { display: flex; gap: 8px; align-items: center; padding: 8px; background: #eef4ff; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+    .pdf-canvas-wrap { min-height: calc(100% - 50px); padding: 14px; display: flex; justify-content: center; align-items: flex-start; background: #dbe3ef; overflow: auto; }
+    .pdf-canvas-wrap canvas { max-width: 100%; height: auto; background: #fff; box-shadow: 0 10px 26px rgba(15, 23, 42, 0.18); }
+    .page-indicator { font-weight: 800; color: #1f2937; min-width: 78px; text-align: center; }
 
     .paper-toolbar {
       display: flex;
@@ -737,7 +737,6 @@
   <script>
     const CLOUD_FUNCTION_URL = "https://1311686407-cg9lh2w33z.ap-guangzhou.tencentscf.com";
     const PDF_SIGN_CACHE_VERSION = "pdfjs-v1";
-    const PDFJS_VIEWER_PATH = "pdfjs/index.html";
 
     const providerConfig = {
       deepseek: { baseUrl: "https://api.deepseek.com/v1/chat/completions", model: "deepseek-chat" },
@@ -1338,7 +1337,7 @@
       }
       try {
         const url = await getPaperReadUrl(paper);
-        window.open(pdfJsViewerUrl(url), "_blank", "noopener");
+        window.open(url, "_blank", "noopener");
       } catch (error) {
         alert("PDF 阅读链接生成失败：" + error.message);
       }
@@ -1356,10 +1355,18 @@
       body.innerHTML = `<div class="notice" style="margin:16px;">正在生成 PDF 临时阅读链接...</div>`;
       try {
         const url = await getPaperReadUrl(paper);
-        const viewerUrl = pdfJsViewerUrl(url);
-        body.innerHTML = `<div class="preview-actions"><a class="btn primary" href="${escapeHtml(viewerUrl)}" target="_blank" rel="noopener">新窗口阅读</a><a class="btn" href="${escapeHtml(url)}" target="_blank" rel="noopener">原始PDF链接</a><span class="hint">使用仓库内 PDF.js 阅读器；若下方空白，请用新窗口阅读。</span></div><iframe class="pdf-frame" src="${escapeHtml(viewerUrl)}" title="${escapeHtml(paper.title)}"></iframe>`;
+        body.innerHTML = `
+          <div class="preview-actions">
+            <a class="btn primary" href="${escapeHtml(url)}" target="_blank" rel="noopener">新窗口阅读</a>
+            <button class="btn" type="button" id="pdfPrevPage">上一页</button>
+            <span class="page-indicator" id="pdfPageInfo">-- / --</span>
+            <button class="btn" type="button" id="pdfNextPage">下一页</button>
+            <span class="hint">使用同仓库 pdfjs 文件夹渲染；若加载失败，请用新窗口阅读。</span>
+          </div>
+          <div class="pdf-canvas-wrap"><canvas id="pdfPreviewCanvas"></canvas></div>`;
+        await renderPdfPreview(url);
       } catch (error) {
-        body.innerHTML = `<div class="notice warn" style="margin:16px;">PDF 阅读链接生成失败：${escapeHtml(error.message)}。请确认云函数已部署最新 index.js，且 COS_SECRET_ID / COS_SECRET_KEY 对该桶有 GetObject 权限。</div>`;
+        body.innerHTML = `<div class="notice warn" style="margin:16px;">PDF 阅读链接或预览渲染失败：${escapeHtml(error.message)}。请确认 GitHub 仓库根目录下存在 pdfjs/pdf.mjs 和 pdfjs/pdf.worker.mjs；也可点击“直接阅读PDF”在新窗口阅读。</div>`;
       }
     }
 
@@ -1373,8 +1380,49 @@
       return url;
     }
 
-    function pdfJsViewerUrl(pdfUrl) {
-      return `${PDFJS_VIEWER_PATH}?file=${encodeURIComponent(pdfUrl)}`;
+    async function loadPdfJs() {
+      if (window.thesisPdfJs) return window.thesisPdfJs;
+      const pdfjs = await import("./pdfjs/pdf.mjs");
+      pdfjs.GlobalWorkerOptions.workerSrc = "./pdfjs/pdf.worker.mjs";
+      window.thesisPdfJs = pdfjs;
+      return pdfjs;
+    }
+
+    async function renderPdfPreview(url) {
+      const pdfjs = await loadPdfJs();
+      const loadingTask = pdfjs.getDocument({ url, withCredentials: false });
+      const pdf = await loadingTask.promise;
+      let pageNumber = 1;
+      const canvas = document.getElementById("pdfPreviewCanvas");
+      const info = document.getElementById("pdfPageInfo");
+      const prev = document.getElementById("pdfPrevPage");
+      const next = document.getElementById("pdfNextPage");
+      const draw = async () => {
+        const page = await pdf.getPage(pageNumber);
+        const wrap = canvas.closest(".pdf-canvas-wrap");
+        const baseViewport = page.getViewport({ scale: 1 });
+        const targetWidth = Math.min(wrap.clientWidth - 28, 920);
+        const scale = Math.max(0.6, targetWidth / baseViewport.width);
+        const viewport = page.getViewport({ scale });
+        const context = canvas.getContext("2d");
+        canvas.width = Math.floor(viewport.width);
+        canvas.height = Math.floor(viewport.height);
+        await page.render({ canvasContext: context, viewport }).promise;
+        info.textContent = `${pageNumber} / ${pdf.numPages}`;
+        prev.disabled = pageNumber <= 1;
+        next.disabled = pageNumber >= pdf.numPages;
+      };
+      prev.addEventListener("click", async () => {
+        if (pageNumber <= 1) return;
+        pageNumber -= 1;
+        await draw();
+      });
+      next.addEventListener("click", async () => {
+        if (pageNumber >= pdf.numPages) return;
+        pageNumber += 1;
+        await draw();
+      });
+      await draw();
     }
 
     function wireFloatingPreview() {
