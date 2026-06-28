@@ -919,7 +919,11 @@
       else activateModule("home");
     }
 
-    if (user) showApp(user.role, user.name);
+    if (user?.verified) {
+      showApp(user.role, user.name);
+    } else {
+      localStorage.removeItem("thesisUser");
+    }
 
     document.getElementById("loginBtn").addEventListener("click", async () => {
       const role = document.getElementById("loginRole").value;
@@ -931,11 +935,24 @@
         box.textContent = "请填写姓名和邀请码。";
         return;
       }
-      const loginUser = { role, name, loginAt: new Date().toISOString(), verified: false };
-      localStorage.setItem("thesisUser", JSON.stringify(loginUser));
-      box.className = "notice ok";
-      box.textContent = "登录成功，正在进入系统。";
-      showApp(role, name);
+      box.className = "notice";
+      box.textContent = "正在校验登录信息...";
+      try {
+        const ok = await verifyPin(role, name, pin);
+        if (!ok) {
+          box.className = "notice warn";
+          box.textContent = "姓名或邀请码不匹配，请核对后重试。";
+          return;
+        }
+        const loginUser = { role, name, loginAt: new Date().toISOString(), verified: true };
+        localStorage.setItem("thesisUser", JSON.stringify(loginUser));
+        box.className = "notice ok";
+        box.textContent = "登录成功，正在进入系统。";
+        showApp(role, name);
+      } catch (error) {
+        box.className = "notice warn";
+        box.textContent = "登录名单读取失败：" + error.message;
+      }
     });
 
     document.getElementById("logoutBtn").addEventListener("click", () => {
