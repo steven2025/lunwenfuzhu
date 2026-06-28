@@ -734,10 +734,7 @@
   </div>
 
   <script>
-    const PIN_URLS = {
-      student: "https://lunwenfuzu-1311686407.cos.ap-guangzhou.myqcloud.com/studentPIN.txt",
-      teacher: "https://lunwenfuzu-1311686407.cos.ap-guangzhou.myqcloud.com/teacherPIN.txt"
-    };
+    const CLOUD_FUNCTION_URL = "https://1311686407-cg9lh2w33z.ap-guangzhou.tencentscf.com";
 
     const providerConfig = {
       deepseek: { baseUrl: "https://api.deepseek.com/v1/chat/completions", model: "deepseek-chat" },
@@ -874,21 +871,25 @@
     }
 
     async function syncCloud(action, payload) {
-      const saved = JSON.parse(localStorage.getItem("thesisModelConfig") || "{}");
-      if (!saved.cloudFunctionUrl) return null;
-      const currentUser = JSON.parse(localStorage.getItem("thesisUser") || "null") || {};
       try {
-        const response = await fetch(saved.cloudFunctionUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action, user: currentUser, payload })
-        });
-        if (!response.ok) throw new Error("HTTP " + response.status);
-        return await response.json();
+        return await callCloudFunction(action, payload);
       } catch (error) {
         console.warn("cloud sync failed", action, error);
         return null;
       }
+    }
+
+    async function callCloudFunction(action, payload) {
+      const currentUser = JSON.parse(localStorage.getItem("thesisUser") || "null") || {};
+      const response = await fetch(CLOUD_FUNCTION_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, user: currentUser, payload })
+      });
+      if (!response.ok) throw new Error("云函数 HTTP " + response.status);
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.message || "云函数调用失败");
+      return data.result;
     }
 
     function renderProjectStrip() {
@@ -965,14 +966,15 @@
     });
 
     async function verifyPin(role, name, pin) {
-      const res = await fetch(PIN_URLS[role], { cache: "no-store" });
-      if (!res.ok) throw new Error("无法读取登录名单 HTTP " + res.status);
-      const text = await res.text();
-      const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-      return lines.some((line) => {
-        const parts = line.split(/[,，\s|:：\t]+/).filter(Boolean);
-        return line.includes(name) && line.includes(pin) || (parts.includes(name) && parts.includes(pin));
+      const response = await fetch(CLOUD_FUNCTION_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "verifyLogin", payload: { role, name, pin } })
       });
+      if (!response.ok) throw new Error("云函数 HTTP " + response.status);
+      const data = await response.json();
+      if (!data.ok) throw new Error(data.message || "云函数校验失败");
+      return !!data.result?.verified;
     }
 
     document.querySelectorAll(".nav-btn").forEach((btn) => {
@@ -1040,7 +1042,6 @@
             <div class="field"><label>接口地址</label><input id="baseUrl" type="text"></div>
             <div class="field"><label>模型名称</label><input id="modelName" type="text"></div>
             <div class="field"><label>API Key</label><input id="apiKey" type="password" placeholder="请输入 API Key"></div>
-            <div class="field"><label>云函数接口地址</label><input id="cloudFunctionUrl" type="text" placeholder="部署腾讯云函数后填写 API 网关地址"></div>
             <div class="row"><button class="btn primary" id="saveModelBtn">保存配置</button><button class="btn" id="testModelBtn">测试是否接通</button></div>
             <div id="modelResult" class="notice" style="margin-top:14px;">尚未测试模型连接。</div>
           </div>
@@ -1066,8 +1067,7 @@
           provider: provider.value,
           baseUrl: baseUrl.value.trim(),
           modelName: modelName.value.trim(),
-          apiKey: document.getElementById("apiKey").value.trim(),
-          cloudFunctionUrl: document.getElementById("cloudFunctionUrl").value.trim()
+          apiKey: document.getElementById("apiKey").value.trim()
         }));
         document.getElementById("modelResult").className = "notice ok";
         document.getElementById("modelResult").textContent = "模型配置已保存。";
@@ -1098,7 +1098,6 @@
         document.getElementById("baseUrl").value = saved.baseUrl || providerConfig.deepseek.baseUrl;
         document.getElementById("modelName").value = saved.modelName || providerConfig.deepseek.model;
         document.getElementById("apiKey").value = saved.apiKey || "";
-        document.getElementById("cloudFunctionUrl").value = saved.cloudFunctionUrl || "";
       }
       const connected = localStorage.getItem("thesisModelConnected") === "true";
       document.getElementById("modelDot").classList.toggle("ok", connected);
@@ -1328,10 +1327,14 @@
     function openPaperPreview(paper) {
       const box = document.getElementById("paperPreview");
       document.getElementById("paperPreviewTitle").textContent = paper.title;
-      document.getElementById("paperPreviewBody").innerHTML = paper.pdfUrl
-        ? `<div class="preview-actions"><a class="btn primary" href="${escapeHtml(paper.pdfUrl)}" target="_blank" rel="noopener">新窗口打开PDF</a><span class="hint">若下方空白，请用新窗口打开。</span></div><object data="${escapeHtml(paper.pdfUrl)}#toolbar=1" type="application/pdf"><iframe src="${escapeHtml(paper.pdfUrl)}"></iframe></object>`
-        : `<div class="notice warn" style="margin:16px;">PDF 样本论文链接待配置。上传至腾讯云 COS 后，可将链接填入该论文的 pdfUrl 字段。</div>`;
+      const body = document.getElementById("paperPreviewBody");
       box.classList.add("show");
+      if (!paper.pdfUrl) {
+        body.innerHTML = `<div class="notice warn" style="margin:16px;">PDF 样本论文链接待配置。上传至腾讯云 COS 后，可将链接填入该论文的 pdfUrl 字段。</div>`;
+        return;
+      }
+      const url = paper.pdfUrl;
+      body.innerHTML = `<div class="preview-actions"><a class="btn primary" href="${escapeHtml(url)}" target="_blank" rel="noopener">新窗口打开PDF</a><span class="hint">COS 已设置公有读；若下方空白，请用新窗口打开。</span></div><object data="${escapeHtml(url)}#toolbar=1" type="application/pdf"><iframe src="${escapeHtml(url)}"></iframe></object>`;
     }
 
     function wireFloatingPreview() {
@@ -1360,12 +1363,18 @@
     async function handleAnalyzePaper(paper) {
       const cached = loadPaperAnalysis(paper.id);
       if (cached) {
-        syncCloud("savePaperAnalysisFirst", { paperId: paper.id, analysis: cached });
         showPaperAnalysis(paper, "abstract", cached);
         return;
       }
       const contentBox = document.getElementById("paperAnalysisContent");
-      contentBox.innerHTML = `<div class="notice">正在进行首次 AI 拆解。首次结果会优先保留，后续云函数接入后可写入 COS。</div>`;
+      contentBox.innerHTML = `<div class="notice">正在检查是否已有公共拆解内容...</div>`;
+      const shared = await loadSharedPaperAnalysis(paper.id);
+      if (shared) {
+        savePaperAnalysisLocal(paper.id, shared);
+        showPaperAnalysis(paper, "abstract", shared);
+        return;
+      }
+      contentBox.innerHTML = `<div class="notice">尚无公共拆解内容，正在进行首次 AI 拆解。生成后会保存到 COS，后续所有用户直接调用该内容。</div>`;
       try {
         const generated = await requestPaperAnalysis(paper);
         savePaperAnalysis(paper.id, generated);
@@ -1374,6 +1383,24 @@
         contentBox.innerHTML = `<div class="notice warn">AI 拆解暂未成功：${escapeHtml(error.message)}。以下先显示内置拆解框架，接通模型后可重新生成。</div>`;
         showPaperAnalysis(paper, "abstract", paper.analysis);
       }
+    }
+
+    async function loadSharedPaperAnalysis(paperId) {
+      try {
+        const data = await callCloudFunction("getPaperAnalysis", { paperId });
+        return extractPaperAnalysis(data);
+      } catch (error) {
+        console.warn("paper analysis cloud load failed", error);
+        return null;
+      }
+    }
+
+    function extractPaperAnalysis(data) {
+      if (!data) return null;
+      if (data.payload?.analysis) return data.payload.analysis;
+      if (data.analysis) return data.analysis;
+      if (data.payload?.payload?.analysis) return data.payload.payload.analysis;
+      return null;
     }
 
     async function requestPaperAnalysis(paper) {
@@ -1441,11 +1468,15 @@ JSON字段必须包括：
     }
 
     function savePaperAnalysis(paperId, analysis) {
+      savePaperAnalysisLocal(paperId, analysis);
+      syncCloud("savePaperAnalysisFirst", { paperId, analysis });
+    }
+
+    function savePaperAnalysisLocal(paperId, analysis) {
       const store = paperAnalysisStore();
       if (!store[paperId]) {
         store[paperId] = analysis;
         localStorage.setItem("paperAnalysisCache", JSON.stringify(store));
-        syncCloud("savePaperAnalysisFirst", { paperId, analysis });
       }
     }
 
