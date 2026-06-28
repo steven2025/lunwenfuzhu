@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>本科毕业论文过程指导系统</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --text: #1f2937;
+      --muted: #667085;
+      --line: #d9dee8;
+      --brand: #2563eb;
+      --brand-dark: #1d4ed8;
+      --ok: #15803d;
+      --warn: #a15c07;
+      --soft: #eef4ff;
+      --soft-green: #edf7ee;
+      --soft-warn: #fff7e6;
+      --side: #111827;
+      --shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      letter-spacing: 0;
+    }
+
+    button, input, textarea, select { font: inherit; }
+    button { cursor: pointer; }
+
+    .hidden { display: none !important; }
+
+    .login-shell {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        linear-gradient(180deg, rgba(37, 99, 235, 0.06), rgba(37, 99, 235, 0)),
+        var(--bg);
+    }
+
+    .login-card {
+      width: min(980px, 100%);
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .intro, .login-panel, .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .intro { padding: 28px; }
+    .intro h1 { margin: 0 0 12px; font-size: 30px; line-height: 1.25; }
+    .intro p { color: var(--muted); line-height: 1.8; margin: 0 0 18px; }
+    .developer { margin-top: 24px; color: #0f172a; font-weight: 700; }
+
+    .login-panel { padding: 24px; }
+
+    .app {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      background: var(--side);
+      color: #e5edf7;
+      padding: 18px 14px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .brand {
+      padding: 6px 10px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      margin-bottom: 12px;
+    }
+
+    .brand h1 { margin: 0 0 8px; font-size: 18px; line-height: 1.35; }
+    .brand p { margin: 0; color: #aebbd0; font-size: 13px; line-height: 1.6; }
+
+    .nav-title {
+      color: #91a1ba;
+      font-size: 12px;
+      padding: 14px 10px 7px;
+    }
+
+    .nav-btn, .sub-btn {
+      border: 0;
+      border-radius: var(--radius);
+      min-height: 40px;
+      text-align: left;
+    }
+
+    .nav-btn {
+      width: 100%;
+      background: transparent;
+      color: #d6e0ee;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      margin-bottom: 3px;
+    }
+
+    .nav-btn:hover { background: rgba(255, 255, 255, 0.08); }
+    .nav-btn.active { background: var(--brand); color: #fff; }
+    .nav-icon { width: 24px; flex: 0 0 24px; text-align: center; font-size: 12px; color: inherit; opacity: .9; }
+
+    .main { min-width: 0; padding: 22px; }
+
+    .devbar {
+      background: #0f172a;
+      color: #fff;
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      box-shadow: var(--shadow);
+    }
+
+    .devbar span:last-child { color: #cbd5e1; }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .topbar h2 { margin: 0; font-size: 24px; line-height: 1.35; }
+    .topbar p { margin: 5px 0 0; color: var(--muted); line-height: 1.55; }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      padding: 8px 12px;
+      border-radius: 999px;
+      color: var(--muted);
+      white-space: nowrap;
+      font-size: 14px;
+    }
+
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; }
+    .dot.ok { background: var(--ok); }
+
+    .project-strip {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .project-item {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px;
+      min-height: 62px;
+    }
+
+    .project-item small { display: block; color: var(--muted); margin-bottom: 5px; }
+    .project-item strong { display: block; font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; }
+
+    .module { display: none; }
+    .module.active { display: block; }
+
+    .panel { padding: 18px; }
+    .panel h3 { margin: 0 0 12px; font-size: 18px; line-height: 1.4; }
+    .panel h4 { margin: 18px 0 10px; font-size: 15px; }
+
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+    .span-4 { grid-column: span 4; }
+    .span-5 { grid-column: span 5; }
+    .span-6 { grid-column: span 6; }
+    .span-7 { grid-column: span 7; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: span 12; }
+
+    .hint { color: var(--muted); font-size: 14px; line-height: 1.7; margin: 0 0 14px; }
+
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-weight: 600; margin-bottom: 7px; font-size: 14px; }
+    .field input, .field textarea, .field select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px 11px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+    }
+
+    .field textarea { min-height: 112px; resize: vertical; line-height: 1.65; }
+    .field input:focus, .field textarea:focus, .field select:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+    }
+
+    .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+    .btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: var(--radius);
+      padding: 9px 13px;
+      min-height: 40px;
+    }
+
+    .btn:hover { border-color: #aab4c4; }
+    .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .btn.primary:hover { background: var(--brand-dark); }
+
+    .notice {
+      border-left: 4px solid var(--brand);
+      background: var(--soft);
+      padding: 12px 13px;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      color: #26415f;
+      line-height: 1.65;
+      font-size: 14px;
+    }
+
+    .notice.ok { border-color: var(--ok); background: var(--soft-green); color: #22543d; }
+    .notice.warn { border-color: var(--warn); background: var(--soft-warn); color: #744210; }
+
+    .subnav-shell {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .subnav {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 10px;
+      position: sticky;
+      top: 18px;
+    }
+
+    .subnav h3 {
+      font-size: 15px;
+      margin: 6px 8px 10px;
+    }
+
+    .sub-btn {
+      width: 100%;
+      background: transparent;
+      padding: 10px;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .sub-btn:hover { background: #f1f5f9; }
+    .sub-btn.active { background: var(--soft); color: var(--brand-dark); font-weight: 700; }
+
+    .work-area {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+      min-height: 540px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }
+
+    .mini-card {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: var(--radius);
+      padding: 14px;
+      min-height: 120px;
+    }
+
+    .mini-card strong { display: block; margin-bottom: 8px; }
+    .mini-card p { color: var(--muted); margin: 0; line-height: 1.6; font-size: 14px; }
+
+    .check-list { display: grid; gap: 9px; margin: 10px 0 14px; }
+    .check {
+      display: flex;
+      gap: 9px;
+      align-items: flex-start;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px;
+      background: #fff;
+      line-height: 1.5;
+    }
+    .check input { margin-top: 4px; }
+
+    .result {
+      border: 1px dashed #aab4c4;
+      border-radius: var(--radius);
+      padding: 13px;
+      background: #fbfcfe;
+      line-height: 1.75;
+      min-height: 88px;
+      white-space: pre-wrap;
+    }
+
+    .coach-output {
+      width: 100%;
+      min-height: 420px;
+      max-height: 620px;
+      overflow-y: auto;
+      border: 1px dashed #aab4c4;
+      border-radius: var(--radius);
+      padding: 13px;
+      background: #fbfcfe;
+      line-height: 1.75;
+      white-space: pre-wrap;
+      color: var(--text);
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+
+    table { width: 100%; border-collapse: collapse; min-width: 760px; }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      padding: 10px;
+      vertical-align: top;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    th { background: #f1f5f9; color: #334155; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+
+    details.drawer {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+
+    details.drawer summary {
+      list-style: none;
+      padding: 12px 14px;
+      cursor: pointer;
+      font-weight: 700;
+      background: #f8fafc;
+      border-bottom: 1px solid transparent;
+    }
+
+    details.drawer[open] summary { border-bottom-color: var(--line); }
+    details.drawer summary::-webkit-details-marker { display: none; }
+    .drawer-body { padding: 12px; }
+
+    .topic-row {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin-bottom: 10px;
+      background: #fff;
+    }
+
+    .topic-row h4 { margin: 0 0 8px; }
+    .topic-row p { color: var(--muted); margin: 0 0 10px; line-height: 1.6; font-size: 14px; }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .detail-box {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px;
+      background: #fbfcfe;
+      line-height: 1.65;
+      font-size: 14px;
+    }
+
+    .detail-box strong { display: block; margin-bottom: 6px; }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #edf2f7;
+      color: #475569;
+      font-size: 12px;
+      margin: 0 6px 6px 0;
+    }
+
+    @media (max-width: 1100px) {
+      .project-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .subnav-shell { grid-template-columns: 1fr; }
+      .subnav { position: static; }
+      .detail-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 900px) {
+      .login-card { grid-template-columns: 1fr; }
+      .app { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; }
+      .main { padding: 16px; }
+      .span-4, .span-5, .span-6, .span-7, .span-8, .span-12 { grid-column: span 12; }
+      .topbar { flex-direction: column; }
+      .project-strip { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <section id="loginShell" class="login-shell">
+    <div class="login-card">
+      <div class="intro">
+        <h1>本科毕业论文过程指导系统</h1>
+        <p>系统定位为教师与学生之间的论文指导互动平台。AI 负责解释步骤、提出追问、帮助检查证据链；教师负责审核、修改和最终把关；学生在每一步完成明确的阶段产出。</p>
+        <div class="cards">
+          <div class="mini-card"><strong>学生端</strong><p>选题、文献、提纲、研究方法、数据获取、数据分析六个助手。</p></div>
+          <div class="mini-card"><strong>教师端</strong><p>查看学生进度，审核题目、提纲、开题报告、初稿和修改稿。</p></div>
+          <div class="mini-card"><strong>COS 存储</strong><p>用户白名单、学生档案、上传文件和教师意见后续通过云函数读写。</p></div>
+        </div>
+        <div class="developer">程序开发 鄢清华 重庆工商大学</div>
+      </div>
+
+      <div class="login-panel">
+        <h3>登录</h3>
+        <p class="hint">开发阶段暂不校验姓名和邀请码，选择身份后可直接进入对应界面。COS 名单链接已保留，后续接云函数时再启用。</p>
+        <div class="field">
+          <label for="loginRole">身份</label>
+          <select id="loginRole">
+            <option value="student">学生</option>
+            <option value="teacher">教师</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="loginName">姓名</label>
+          <input id="loginName" type="text" placeholder="请输入姓名" />
+        </div>
+        <div class="field">
+          <label for="inviteCode">邀请码</label>
+          <input id="inviteCode" type="text" placeholder="请输入邀请码" />
+        </div>
+        <button class="btn primary" id="loginBtn" style="width:100%;">登录系统</button>
+        <div id="loginResult" class="notice" style="margin-top:14px;">开发模式：不校验邀请码，便于调试和修改程序。</div>
+        <p class="hint" style="margin-top:14px;">后续正式版将由云函数读取 COS 中的 studentPIN.txt 和 teacherPIN.txt 进行校验。</p>
+      </div>
+    </div>
+  </section>
+
+  <div id="appShell" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand">
+        <h1>论文过程指导系统</h1>
+        <p id="roleLabel">学生端</p>
+      </div>
+      <div class="nav-title">系统</div>
+      <button class="nav-btn active" data-target="home"><span class="nav-icon">01</span>首页</button>
+      <button class="nav-btn" data-target="model"><span class="nav-icon">02</span>大模型接入</button>
+
+      <div id="studentNav">
+        <div class="nav-title">学生助手</div>
+        <button class="nav-btn" data-target="topic"><span class="nav-icon">03</span>选题助手</button>
+        <button class="nav-btn" data-target="literature"><span class="nav-icon">04</span>文献助手</button>
+        <button class="nav-btn" data-target="outline"><span class="nav-icon">05</span>提纲助手</button>
+        <button class="nav-btn" data-target="method"><span class="nav-icon">06</span>研究方法助手</button>
+        <button class="nav-btn" data-target="collection"><span class="nav-icon">07</span>数据获取助手</button>
+        <button class="nav-btn" data-target="analysis"><span class="nav-icon">08</span>数据分析助手</button>
+        <button class="nav-btn" data-target="submissions"><span class="nav-icon">09</span>我的提交</button>
+        <button class="nav-btn" data-target="comments"><span class="nav-icon">10</span>教师意见</button>
+      </div>
+
+      <div id="teacherNav" class="hidden">
+        <div class="nav-title">教师工作台</div>
+        <button class="nav-btn" data-target="teacherOverview"><span class="nav-icon">03</span>学生进度</button>
+        <button class="nav-btn" data-target="teacherReview"><span class="nav-icon">04</span>审核中心</button>
+        <button class="nav-btn" data-target="teacherStudent"><span class="nav-icon">05</span>学生档案</button>
+        <button class="nav-btn" data-target="teacherMessage"><span class="nav-icon">06</span>意见通知</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="devbar">
+        <span>程序开发 鄢清华 重庆工商大学</span>
+        <span id="currentUserLabel">未登录</span>
+      </div>
+
+      <div class="topbar">
+        <div>
+          <h2 id="pageTitle">首页</h2>
+          <p id="pageSub">系统以论文训练和师生互动为中心，帮助学生理解每一步为什么做、怎么做、产出什么。</p>
+        </div>
+        <div class="status-pill"><span id="modelDot" class="dot"></span><span id="modelStatus">模型未接通</span></div>
+      </div>
+
+      <div class="project-strip" id="projectStrip"></div>
+
+      <section id="home" class="module active"></section>
+      <section id="model" class="module"></section>
+      <section id="topic" class="module"></section>
+      <section id="literature" class="module"></section>
+      <section id="outline" class="module"></section>
+      <section id="method" class="module"></section>
+      <section id="collection" class="module"></section>
+      <section id="analysis" class="module"></section>
+      <section id="submissions" class="module"></section>
+      <section id="comments" class="module"></section>
+      <section id="teacherOverview" class="module"></section>
+      <section id="teacherReview" class="module"></section>
+      <section id="teacherStudent" class="module"></section>
+      <section id="teacherMessage" class="module"></section>
+    </main>
+  </div>
+
+  <script>
+    const PIN_URLS = {
+      student: "https://lunwenfuzu-1311686407.cos.ap-guangzhou.myqcloud.com/studentPIN.txt",
+      teacher: "https://lunwenfuzu-1311686407.cos.ap-guangzhou.myqcloud.com/teacherPIN.txt"
+    };
+
+    const providerConfig = {
+      deepseek: { baseUrl: "https://api.deepseek.com/v1/chat/completions", model: "deepseek-chat" },
+      openai: { baseUrl: "https://api.openai.com/v1/chat/completions", model: "gpt-4.1-mini" },
+      doubao: { baseUrl: "https://ark.cn-beijing.volces.com/api/v3/chat/completions", model: "请填入火山方舟模型接入点 ID" },
+      qwen: { baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", model: "qwen-plus" },
+      custom: { baseUrl: "", model: "" }
+    };
+
+    const topicBank = {
+      人力资源管理: {
+        公司案例型: ["某公司新员工培训体系优化研究", "某公司绩效考核体系存在的问题及改进研究", "某企业员工流失原因及对策研究"],
+        群体调查型: ["新员工组织社会化现状及影响因素研究", "高校毕业生就业期望与职业选择研究", "知识型员工工作满意度调查研究"],
+        变量关系实证型: ["亲和型领导对员工工作投入的影响研究", "心理资本对员工创新行为的影响研究", "组织支持感对员工离职倾向的影响研究"],
+        行业平台现象型: ["数字化招聘平台对大学生求职行为的影响研究", "灵活用工背景下青年员工职业安全感研究"],
+        对策研究型: ["新生代员工激励机制优化研究", "中小企业员工培训效果提升路径研究"],
+        文献综述型: ["数字化转型背景下企业人力资源管理研究综述", "新生代员工激励机制研究综述"]
+      },
+      工商管理: {
+        公司案例型: ["某企业数字化转型路径研究", "某公司供应链管理优化研究", "某企业组织管理问题及对策研究"],
+        群体调查型: ["中小企业管理创新现状调查研究", "大学生创业意愿影响因素研究"],
+        变量关系实证型: ["企业社会责任对消费者购买意愿的影响研究", "组织学习能力对企业创新绩效的影响研究"],
+        行业平台现象型: ["平台经济背景下中小企业经营模式转型研究", "数字化工具对企业运营效率的影响研究"],
+        对策研究型: ["中小企业管理创新问题及对策研究", "某企业内部控制优化研究"],
+        文献综述型: ["企业数字化转型研究综述", "中小企业韧性管理研究综述"]
+      },
+      旅游管理: {
+        公司案例型: ["某景区智慧旅游建设现状及优化研究", "某酒店服务质量提升研究", "某民宿品牌运营策略研究"],
+        群体调查型: ["大学生研学旅游需求调查研究", "游客满意度对重游意愿的影响研究", "乡村旅游游客体验调查研究"],
+        变量关系实证型: ["目的地形象感知对游客重游意愿的影响研究", "旅游短视频对目的地选择意愿的影响研究"],
+        行业平台现象型: ["旅游短视频传播对目的地形象塑造的影响研究", "乡村旅游直播营销现象研究"],
+        对策研究型: ["乡村旅游服务质量提升路径研究", "某景区游客投诉管理优化研究"],
+        文献综述型: ["智慧旅游服务质量研究综述", "乡村旅游游客体验研究综述"]
+      },
+      市场营销: {
+        公司案例型: ["某品牌营销策略优化研究", "某企业社交媒体营销策略研究", "某品牌顾客忠诚度提升研究"],
+        群体调查型: ["大学生国潮品牌消费偏好调查研究", "社区团购用户满意度调查研究", "消费者直播购物体验调查研究"],
+        变量关系实证型: ["社交媒体营销对消费者购买意愿的影响研究", "品牌信任对顾客忠诚度的影响研究", "直播电商情境下消费者冲动购买行为研究"],
+        行业平台现象型: ["直播电商促销机制对消费者决策的影响研究", "短视频内容营销对品牌认知的影响研究"],
+        对策研究型: ["某品牌私域流量运营优化研究", "新消费品牌营销策略优化研究"],
+        文献综述型: ["直播电商消费者行为研究综述", "社交媒体营销效果研究综述"]
+      },
+      国际商务: {
+        公司案例型: ["某企业国际市场进入策略研究", "某跨境电商企业海外仓运营优化研究", "某出口企业国际营销策略研究"],
+        群体调查型: ["跨境电商消费者信任影响因素研究", "中小外贸企业数字化转型现状调查研究"],
+        变量关系实证型: ["跨境电商平台服务质量对消费者信任的影响研究", "国际物流服务质量对跨境电商客户满意度的影响研究"],
+        行业平台现象型: ["RCEP 背景下中小企业出口机遇与挑战研究", "跨境电商直播营销对海外消费者购买意愿的影响研究"],
+        对策研究型: ["中小企业跨境电商运营优化研究", "某企业国际物流成本控制研究"],
+        文献综述型: ["跨境电商平台信任机制研究综述", "RCEP 背景下国际商务发展研究综述"]
+      }
+    };
+
+    const moduleMeta = {
+      home: ["首页", "系统以论文训练和师生互动为中心，帮助学生理解每一步为什么做、怎么做、产出什么。"],
+      model: ["大模型接入", "选择服务商、输入 API Key、自动匹配接口和模型，并测试是否接通。"],
+      topic: ["选题助手", "从专业、兴趣和资源条件出发，形成可研究、可执行、可审核的题目。"],
+      literature: ["文献助手", "学习如何检索、阅读、比较和总结文献，并形成文献矩阵。"],
+      outline: ["提纲助手", "形成与题目和论文类型匹配的论文结构，并明确每章任务。"],
+      method: ["研究方法助手", "理解方法是什么、为什么用、怎么做，以及方法如何支撑研究结果。"],
+      collection: ["数据获取助手", "制定问卷、访谈、案例材料、二手数据等获取计划。"],
+      analysis: ["数据分析助手", "把数据转化为证据，并说明证据能支持什么结论。"],
+      submissions: ["我的提交", "查看题目、提纲、开题报告、初稿、修改稿等提交状态。"],
+      comments: ["教师意见", "查看教师对各阶段材料的审核、修改和建议。"],
+      teacherOverview: ["学生进度", "查看学生论文进度、阶段状态和风险提醒。"],
+      teacherReview: ["审核中心", "审核并修改学生题目、提纲、开题报告、初稿和修改稿。"],
+      teacherStudent: ["学生档案", "查看单个学生的论文全过程档案。"],
+      teacherMessage: ["意见通知", "向学生发送个别意见或统一通知。"]
+    };
+
+    const user = JSON.parse(localStorage.getItem("thesisUser") || "null");
+    let project = {
+      major: "",
+      topic: "",
+      topicCategory: "",
+      outline: "",
+      method: "",
+      stage: "选题中",
+      progress: 12,
+      ...JSON.parse(localStorage.getItem("thesisProject") || "{}")
+    };
+
+    function saveProject(patch = {}) {
+      project = { ...project, ...patch };
+      localStorage.setItem("thesisProject", JSON.stringify(project));
+      renderProjectStrip();
+    }
+
+    function renderProjectStrip() {
+      const items = [
+        ["专业", project.major || "未选择"],
+        ["题目", project.topic || "未确定"],
+        ["阶段", project.stage || "未开始"],
+        ["提纲", project.outline ? "已保存" : "未提交"],
+        ["方法", project.method || "未确定"],
+        ["进度", `${project.progress || 0}%`]
+      ];
+      document.getElementById("projectStrip").innerHTML = items.map(([k, v]) => {
+        return `<div class="project-item"><small>${k}</small><strong>${escapeHtml(v)}</strong></div>`;
+      }).join("");
+    }
+
+    function showApp(role, name) {
+      document.getElementById("loginShell").classList.add("hidden");
+      document.getElementById("appShell").classList.remove("hidden");
+      document.getElementById("currentUserLabel").textContent = `${role === "teacher" ? "教师" : "学生"}：${name}`;
+      document.getElementById("roleLabel").textContent = role === "teacher" ? "教师端" : "学生端";
+      document.getElementById("studentNav").classList.toggle("hidden", role === "teacher");
+      document.getElementById("teacherNav").classList.toggle("hidden", role !== "teacher");
+      renderAllModules();
+      renderProjectStrip();
+      loadModelState();
+      if (role === "teacher") activateModule("teacherOverview");
+      else activateModule("home");
+    }
+
+    if (user) showApp(user.role, user.name);
+
+    document.getElementById("loginBtn").addEventListener("click", async () => {
+      const role = document.getElementById("loginRole").value;
+      const name = document.getElementById("loginName").value.trim();
+      const pin = document.getElementById("inviteCode").value.trim();
+      const box = document.getElementById("loginResult");
+      if (!name || !pin) {
+        box.className = "notice warn";
+        box.textContent = "请填写姓名和邀请码。";
+        return;
+      }
+      const loginUser = { role, name, loginAt: new Date().toISOString(), devMode: true };
+      localStorage.setItem("thesisUser", JSON.stringify(loginUser));
+      box.className = "notice ok";
+      box.textContent = "开发模式登录成功，正在进入系统。";
+      showApp(role, name);
+    });
+
+    async function verifyPin(role, name, pin) {
+      const res = await fetch(PIN_URLS[role], { cache: "no-store" });
+      if (!res.ok) throw new Error("无法读取登录名单 HTTP " + res.status);
+      const text = await res.text();
+      const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      return lines.some((line) => {
+        const parts = line.split(/[,，\s|:：\t]+/).filter(Boolean);
+        return line.includes(name) && line.includes(pin) || (parts.includes(name) && parts.includes(pin));
+      });
+    }
+
+    document.querySelectorAll(".nav-btn").forEach((btn) => {
+      btn.addEventListener("click", () => activateModule(btn.dataset.target));
+    });
+
+    function activateModule(target) {
+      document.querySelectorAll(".nav-btn").forEach((item) => item.classList.toggle("active", item.dataset.target === target));
+      document.querySelectorAll(".module").forEach((item) => item.classList.toggle("active", item.id === target));
+      document.getElementById("pageTitle").textContent = moduleMeta[target][0];
+      document.getElementById("pageSub").textContent = moduleMeta[target][1];
+    }
+
+    function renderAllModules() {
+      renderHome();
+      renderModel();
+      renderStudentAssistant("literature", literatureSubmodules());
+      renderStudentAssistant("outline", outlineSubmodules());
+      renderStudentAssistant("method", methodSubmodules());
+      renderStudentAssistant("collection", collectionSubmodules());
+      renderStudentAssistant("analysis", analysisSubmodules());
+      renderTopicAssistant();
+      renderSubmissions();
+      renderComments();
+      renderTeacherModules();
+    }
+
+    function renderHome() {
+      document.getElementById("home").innerHTML = `
+        <div class="grid">
+          <div class="panel span-8">
+            <h3>系统定位</h3>
+            <p class="hint">本系统是论文指导教师与学生之间的互动系统。它不以“直接给答案”为目标，而是帮助学生理解论文研究过程：是什么、为什么做、怎么做、产出什么、有哪些坑。</p>
+            <div class="cards">
+              <div class="mini-card"><strong>教师</strong><p>审核、修改、批注、把关关键节点，查看学生全过程进度。</p></div>
+              <div class="mini-card"><strong>学生</strong><p>在六个助手中完成阶段任务，提交题目、提纲、材料和分析结果。</p></div>
+              <div class="mini-card"><strong>AI</strong><p>解释步骤、生成追问、检查材料、提示风险，辅助而不替代教师判断。</p></div>
+            </div>
+          </div>
+          <div class="panel span-4">
+            <h3>学生端六个助手</h3>
+            <div class="result">选题助手
+文献助手
+提纲助手
+研究方法助手
+数据获取助手
+数据分析助手</div>
+          </div>
+        </div>`;
+    }
+
+    function renderModel() {
+      document.getElementById("model").innerHTML = `
+        <div class="grid">
+          <div class="panel span-6">
+            <h3>大模型接入</h3>
+            <p class="hint">接入方式保持不变：选择模型服务商，输入 API Key，测试是否接通。</p>
+            <div class="field"><label>模型服务商</label><select id="provider">
+              <option value="deepseek">DeepSeek</option>
+              <option value="openai">ChatGPT / OpenAI</option>
+              <option value="doubao">豆包 / 火山方舟</option>
+              <option value="qwen">通义千问</option>
+              <option value="custom">自定义兼容接口</option>
+            </select></div>
+            <div class="field"><label>接口地址</label><input id="baseUrl" type="text"></div>
+            <div class="field"><label>模型名称</label><input id="modelName" type="text"></div>
+            <div class="field"><label>API Key</label><input id="apiKey" type="password" placeholder="仅保存在当前浏览器本地"></div>
+            <div class="row"><button class="btn primary" id="saveModelBtn">保存配置</button><button class="btn" id="testModelBtn">测试是否接通</button></div>
+            <div id="modelResult" class="notice" style="margin-top:14px;">尚未测试模型连接。</div>
+          </div>
+          <div class="panel span-6">
+            <h3>说明</h3>
+            <div class="notice warn">浏览器直接请求第三方模型接口可能遇到跨域限制。后续云函数接入后，建议由云函数代理模型请求，并负责 COS 数据读写。</div>
+          </div>
+        </div>`;
+      wireModelPanel();
+    }
+
+    function wireModelPanel() {
+      const provider = document.getElementById("provider");
+      const baseUrl = document.getElementById("baseUrl");
+      const modelName = document.getElementById("modelName");
+      provider.addEventListener("change", () => {
+        baseUrl.value = providerConfig[provider.value].baseUrl;
+        modelName.value = providerConfig[provider.value].model;
+      });
+      loadModelState();
+      document.getElementById("saveModelBtn").addEventListener("click", () => {
+        localStorage.setItem("thesisModelConfig", JSON.stringify({
+          provider: provider.value,
+          baseUrl: baseUrl.value.trim(),
+          modelName: modelName.value.trim(),
+          apiKey: document.getElementById("apiKey").value.trim()
+        }));
+        document.getElementById("modelResult").className = "notice ok";
+        document.getElementById("modelResult").textContent = "模型配置已保存。";
+      });
+      document.getElementById("testModelBtn").addEventListener("click", async () => {
+        const result = document.getElementById("modelResult");
+        result.className = "notice";
+        result.textContent = "正在测试连接...";
+        try {
+          await callModel("请只回复：连接成功", "你是连接测试助手。");
+          localStorage.setItem("thesisModelConnected", "true");
+          loadModelState();
+          result.className = "notice ok";
+          result.textContent = "模型已接通，可以用于各模块的个性化反馈。";
+        } catch (error) {
+          localStorage.setItem("thesisModelConnected", "false");
+          loadModelState();
+          result.className = "notice warn";
+          result.textContent = "测试未成功：" + error.message;
+        }
+      });
+    }
+
+    function loadModelState() {
+      const saved = JSON.parse(localStorage.getItem("thesisModelConfig") || "{}");
+      if (document.getElementById("provider")) {
+        document.getElementById("provider").value = saved.provider || "deepseek";
+        document.getElementById("baseUrl").value = saved.baseUrl || providerConfig.deepseek.baseUrl;
+        document.getElementById("modelName").value = saved.modelName || providerConfig.deepseek.model;
+        document.getElementById("apiKey").value = saved.apiKey || "";
+      }
+      const connected = localStorage.getItem("thesisModelConnected") === "true";
+      document.getElementById("modelDot").classList.toggle("ok", connected);
+      document.getElementById("modelStatus").textContent = connected ? "模型已接通" : "模型未接通";
+    }
+
+    async function callModel(userPrompt, systemPrompt) {
+      const saved = JSON.parse(localStorage.getItem("thesisModelConfig") || "{}");
+      if (!saved.baseUrl || !saved.modelName || !saved.apiKey || saved.modelName.includes("请填入")) throw new Error("模型配置不完整");
+      const response = await fetch(saved.baseUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + saved.apiKey },
+        body: JSON.stringify({
+          model: saved.modelName,
+          messages: [
+            { role: "system", content: systemPrompt || "你是本科毕业论文过程指导助教。请用中文回答，强调是什么、为什么、怎么做、产出和常见坑。" },
+            { role: "user", content: userPrompt }
+          ],
+          temperature: 0.4
+        })
+      });
+      if (!response.ok) throw new Error("HTTP " + response.status + "：" + (await response.text()).slice(0, 160));
+      const data = await response.json();
+      return data.choices?.[0]?.message?.content || JSON.stringify(data);
+    }
+
+    function renderTopicAssistant() {
+      document.getElementById("topic").innerHTML = shellWithSubnav("topic", "选题助手", [
+        ["learn", "这一步是什么"],
+        ["references", "分类参考题目"],
+        ["work", "形成候选题目"]
+      ]);
+      setSubContent("topic", "learn", topicLearnHtml());
+      bindSubnav("topic", {
+        learn: () => topicLearnHtml(),
+        references: () => topicReferencesHtml(),
+        work: () => topicWorkHtml()
+      });
+    }
+
+    function shellWithSubnav(moduleId, title, items) {
+      return `
+        <div class="subnav-shell">
+          <div class="subnav">
+            <h3>${title}</h3>
+            ${items.map(([id, label], index) => `<button class="sub-btn ${index === 0 ? "active" : ""}" data-module="${moduleId}" data-sub="${id}">${label}</button>`).join("")}
+          </div>
+          <div class="work-area" id="${moduleId}WorkArea"></div>
+        </div>`;
+    }
+
+    function bindSubnav(moduleId, renderers) {
+      document.querySelectorAll(`.sub-btn[data-module="${moduleId}"]`).forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(`.sub-btn[data-module="${moduleId}"]`).forEach((item) => item.classList.remove("active"));
+          btn.classList.add("active");
+          setSubContent(moduleId, btn.dataset.sub, renderers[btn.dataset.sub]());
+        });
+      });
+    }
+
+    function setSubContent(moduleId, subId, html) {
+      document.getElementById(`${moduleId}WorkArea`).innerHTML = html;
+      if (moduleId === "topic" && subId === "references") wireTopicReferences();
+      if (moduleId === "topic" && subId === "work") wireTopicWork();
+    }
+
+    function topicLearnHtml() {
+      return `
+        <h3>选题助手：先理解，再生成</h3>
+        <div class="grid">
+          <div class="panel span-6"><h3>是什么</h3><p class="hint">选题不是起一个漂亮标题，而是确定一个能够被研究、能够找到证据、能够形成结论的问题。</p></div>
+          <div class="panel span-6"><h3>为什么要做</h3><p class="hint">题目决定后面的文献、提纲、方法、数据和分析。如果题目过大、过空或无法获取资料，后面会全部返工。</p></div>
+          <div class="panel span-6"><h3>怎么做</h3><p class="hint">先阅读分类参考题目的拆解方式，再手动输入自己初步拟定的题目，由系统对范围、难度、文献、数据和常见坑进行诊断。</p></div>
+          <div class="panel span-6"><h3>常见坑</h3><p class="hint">只写宏观概念；没有研究对象；没有数据来源；题目像新闻评论；题目和专业不匹配；只想写结论，没有证据链。</p></div>
+        </div>`;
+    }
+
+    function topicProfileHtml() {
+      return `
+        <h3>专业与资源条件</h3>
+        <p class="hint">先告诉系统你属于哪个专业、倾向哪类题目、手里有什么资源。系统后面的参考题目和建议会基于这些信息。</p>
+        <div class="grid">
+          <div class="panel span-6">
+            <div class="field"><label>专业</label><select id="majorSelect">${Object.keys(topicBank).map((m) => `<option value="${m}">${m}</option>`).join("")}</select></div>
+            <div class="field"><label>题目类型倾向</label><select id="categorySelect">${Object.keys(topicBank["人力资源管理"]).map((c) => `<option value="${c}">${c}</option>`).join("")}</select></div>
+            <div class="field"><label>兴趣关键词</label><textarea id="interestInput" placeholder="例如：新员工培训、直播电商、乡村旅游、跨境电商物流"></textarea></div>
+          </div>
+          <div class="panel span-6">
+            <h3>可获得资源</h3>
+            <div class="check-list" id="resourceChecks">
+              <label class="check"><input type="checkbox" value="有实习单位或企业资料">有实习单位或企业资料</label>
+              <label class="check"><input type="checkbox" value="能够发放问卷">能够发放问卷</label>
+              <label class="check"><input type="checkbox" value="能够访谈研究对象">能够访谈研究对象</label>
+              <label class="check"><input type="checkbox" value="可以获取二手数据">可以获取二手数据</label>
+              <label class="check"><input type="checkbox" value="目前主要能查文献">目前主要能查文献</label>
+            </div>
+            <button class="btn primary" id="saveTopicProfileBtn">保存条件</button>
+          </div>
+        </div>`;
+    }
+
+    function wireTopicProfile() {
+      document.getElementById("majorSelect").value = project.major || "人力资源管理";
+      document.getElementById("categorySelect").value = project.topicCategory || "公司案例型";
+      document.getElementById("interestInput").value = project.interest || "";
+      document.getElementById("saveTopicProfileBtn").addEventListener("click", () => {
+        const resources = checkedValues("#resourceChecks");
+        saveProject({
+          major: document.getElementById("majorSelect").value,
+          topicCategory: document.getElementById("categorySelect").value,
+          interest: document.getElementById("interestInput").value.trim(),
+          resources
+        });
+        alert("已保存专业与资源条件。");
+      });
+    }
+
+    function topicReferencesHtml() {
+      const major = project.major || "人力资源管理";
+      return `
+        <h3>分类参考题目</h3>
+        <p class="hint">参考题目不是让学生照抄，而是帮助学生理解不同题目背后的研究结果、数据要求和方法路径。点击题目可展开抽屉详情。</p>
+        <div class="field"><label>当前专业</label><select id="referenceMajor">${Object.keys(topicBank).map((m) => `<option value="${m}" ${m === major ? "selected" : ""}>${m}</option>`).join("")}</select></div>
+        <div id="referenceDrawers"></div>`;
+    }
+
+    function wireTopicReferences() {
+      const select = document.getElementById("referenceMajor");
+      const render = () => {
+        const major = select.value;
+        document.getElementById("referenceDrawers").innerHTML = Object.entries(topicBank[major]).map(([category, topics]) => {
+          return `<details class="drawer"><summary>${category}</summary><div class="drawer-body">${topics.map((title) => renderTopicRow(major, category, title)).join("")}</div></details>`;
+        }).join("");
+      };
+      select.addEventListener("change", render);
+      render();
+    }
+
+    function renderTopicRow(major, category, title) {
+      const d = topicDetail(major, category, title);
+      return `
+        <div class="topic-row">
+          <h4>${escapeHtml(title)}</h4>
+          <p>${escapeHtml(d.summary)}</p>
+          <div class="detail-grid">
+            <div class="detail-box"><strong>研究意义</strong>${escapeHtml(d.significance)}</div>
+            <div class="detail-box"><strong>重点研究问题</strong>${d.questions.map(escapeHtml).join("<br>")}</div>
+            <div class="detail-box"><strong>可收集数据</strong>${d.data.map(escapeHtml).join("<br>")}</div>
+            <div class="detail-box"><strong>分析方法</strong>${d.methods.map(escapeHtml).join("<br>")}</div>
+            <div class="detail-box"><strong>常见坑</strong>${d.pitfalls.map(escapeHtml).join("<br>")}</div>
+            <div class="detail-box"><strong>阶段产出</strong>${d.output.map(escapeHtml).join("<br>")}</div>
+          </div>
+        </div>`;
+    }
+
+    function topicDetail(major, category, title) {
+      const p = parseTopicParts(title);
+      const subject = p.subject || inferSubjectFromMajor(major);
+      const object = p.object || inferObject(title, category);
+      const action = p.action || inferAction(title, category);
+      const context = p.context || inferContext(title, major);
+
+      if (title.includes("新员工") && title.includes("培训")) {
+        return {
+          summary: `这个题目不是泛泛讨论“培训”，而是研究${subject}面向“新员工”的培训体系是否能帮助新人尽快适应岗位。`,
+          significance: `${subject}的新员工培训关系到入职适应、岗位技能形成、早期离职风险和组织社会化。它值得研究的前提不是“培训时间长或短”，而是培训是否真正解决新员工从校园人、外部人转变为岗位人的问题。`,
+          questions: [
+            `${subject}为什么要把“新员工培训”单独拿出来研究，而不是研究全员培训、管理层培训或技能提升培训？`,
+            `${subject}的新员工培训目标是什么：熟悉制度、掌握岗位技能、融入团队，还是降低试用期流失？`,
+            `新员工上岗后在哪些方面不能快速满足岗位要求：产品知识、服务流程、销售技能、系统操作、团队协作，还是企业文化？`,
+            `现有培训安排、培训内容、培训方式、导师带教、考核反馈之间，哪个环节最可能影响培训效果？`,
+            `如果发现培训时长为两周，这到底是问题、优势，还是行业特征下的正常安排？需要用什么证据判断？`
+          ],
+          data: [
+            `${subject}新员工培训制度、课程表、培训手册、考核表`,
+            `近几批新员工培训时长、参训人数、通过率、试用期留存率或转正率`,
+            `新员工问卷：培训满意度、岗位胜任感、组织融入感、培训内容匹配度`,
+            `访谈资料：新员工、培训负责人、直属主管对培训效果的看法`,
+            `行业或同类企业培训资料，用来判断该公司的培训安排是否真的异常`
+          ],
+          methods: [
+            `案例分析：围绕${subject}培训体系做现状、问题、原因、优化路径分析`,
+            `问卷调查：测量新员工对培训内容、方式、时长、考核和岗位适应的评价`,
+            `访谈法：解释为什么培训后仍不能满足岗位要求`,
+            `对比分析：与行业特点或同类企业做谨慎比较，但不能简单照搬其它行业标准`
+          ],
+          pitfalls: [
+            `把“现状”直接当成“问题”。例如培训两周只是事实，不一定是问题；如果快消行业平均培训一周，而该公司培训两周，可能说明公司更重视新人培养。`,
+            `脱离行业特征做比较。五星级酒店、快消品、互联网销售、制造业一线岗位的新员工培训目标不同，不能只比较培训时长。`,
+            `只问“满意不满意”，没有检查培训是否提升岗位技能和上岗适应。`,
+            `只提出“延长培训时间”，但没有证明问题来自时长，也可能是内容、方式、带教或考核出了问题。`,
+            `建议与证据不对应。若数据说明新员工主要缺产品知识，就不应只建议增加企业文化课程。`
+          ],
+          output: [
+            `界定${subject}新员工培训体系的构成`,
+            `区分培训现状与真正问题`,
+            `形成问题证据表：问题、证据、原因、改进建议一一对应`,
+            `提出适合${subject}行业和岗位特点的优化方案`
+          ]
+        };
+      }
+
+      if (category.includes("变量")) {
+        return variableTopicDetail(title, subject, object, action, context);
+      }
+      if (category.includes("公司") || category.includes("对策")) {
+        return caseTopicDetail(title, subject, object, action, context);
+      }
+      if (category.includes("群体")) {
+        return groupTopicDetail(title, subject, object, action, context);
+      }
+      if (category.includes("综述")) {
+        return reviewTopicDetail(title, subject, object, action, context);
+      }
+      if (category.includes("行业") || title.includes("平台") || title.includes("直播") || title.includes("短视频")) {
+        return phenomenonTopicDetail(title, subject, object, action, context);
+      }
+      return generalTopicDetail(title, subject, object, action, context);
+    }
+
+    function parseTopicParts(title) {
+      const subjectMatch = title.match(/^(某[^的对及]*?(?:公司|企业|景区|酒店|品牌|平台|民宿|出口企业|跨境电商企业))/);
+      const subject = subjectMatch ? subjectMatch[1] : "";
+      const objectMatch = title.match(/(新员工|青年员工|知识型员工|高校毕业生|大学生|游客|消费者|用户|中小企业|中小外贸企业|跨境电商消费者|海外消费者|客户|员工|组织|品牌|景区|企业)/);
+      const actionMatch = title.match(/(培训体系|绩效考核体系|员工流失|薪酬激励机制|组织社会化|工作满意度|工作投入|创新行为|离职倾向|数字化转型|供应链管理|营销策略|服务质量|游客满意度|重游意愿|目的地形象|购买意愿|品牌信任|顾客忠诚度|冲动购买行为|消费者信任|国际物流服务质量|客户满意度|出口机遇与挑战|研究综述|优化|影响因素)/);
+      const contextMatch = title.match(/(直播电商|短视频|社交媒体|国潮品牌|社区团购|乡村旅游|智慧旅游|研学旅游|跨境电商|RCEP|平台经济|数字化转型|灵活用工|新消费品牌)/);
+      return {
+        subject,
+        object: objectMatch ? objectMatch[1] : "",
+        action: actionMatch ? actionMatch[1] : "",
+        context: contextMatch ? contextMatch[1] : ""
+      };
+    }
+
+    function inferSubjectFromMajor(major) {
+      if (major === "旅游管理") return "某旅游企业或景区";
+      if (major === "市场营销") return "某品牌或消费场景";
+      if (major === "国际商务") return "某跨境电商或外贸企业";
+      if (major === "人力资源管理") return "某企业";
+      return "某组织";
+    }
+
+    function inferObject(title, category) {
+      if (title.includes("消费者")) return "消费者";
+      if (title.includes("游客")) return "游客";
+      if (title.includes("员工")) return "员工";
+      if (title.includes("大学生")) return "大学生";
+      if (category.includes("公司")) return "具体组织";
+      return "研究对象";
+    }
+
+    function inferAction(title, category) {
+      if (title.includes("优化")) return "优化";
+      if (title.includes("影响")) return "影响关系";
+      if (title.includes("满意度")) return "满意度";
+      if (title.includes("综述")) return "研究综述";
+      if (category.includes("对策")) return "问题与对策";
+      return "核心问题";
+    }
+
+    function inferContext(title, major) {
+      if (title.includes("直播")) return "直播电商情境";
+      if (title.includes("短视频")) return "短视频传播情境";
+      if (title.includes("跨境")) return "跨境电商情境";
+      if (title.includes("乡村旅游")) return "乡村旅游情境";
+      return major + "专业场景";
+    }
+
+    function caseTopicDetail(title, subject, object, action, context) {
+      return {
+        summary: `该题目适合围绕${subject}做案例研究，重点不是介绍该组织，而是判断${action}中是否存在真实问题，并提出有证据支持的优化建议。`,
+        significance: `${title}的研究意义来自“具体组织 + 具体管理问题”的结合。学生需要说明${subject}为什么值得研究：它是否有代表性、是否正面临转型或管理压力、是否能提供足够资料、该问题是否影响员工、顾客、运营或绩效。`,
+        questions: [
+          `${subject}的基本背景是什么，为什么选择它作为案例？`,
+          `${action}的目标是什么，当前现状是什么？`,
+          `哪些现象是真正的问题，哪些只是中性事实或行业常态？`,
+          `问题是否造成了后果，例如效率下降、满意度降低、流失率上升、投诉增加或成本提高？`,
+          `优化建议如何逐一对应前面发现的问题和原因？`
+        ],
+        data: [
+          `${subject}制度文件、流程资料、岗位说明、培训或营销方案等内部材料`,
+          `员工、主管、顾客或管理者访谈记录`,
+          `问卷数据：满意度、认知、需求、问题感知等`,
+          `业务结果数据：流失率、投诉率、转化率、复购率、绩效或成本变化`,
+          `行业资料或同类组织资料，用于判断该现象是否真是问题`
+        ],
+        methods: [
+          `案例分析：背景、现状、问题、原因、对策`,
+          `访谈法：解释制度或流程背后的真实原因`,
+          `问卷调查：验证问题是否普遍存在`,
+          `对比分析：与行业标准或同类对象比较，但必须考虑行业、规模和岗位差异`
+        ],
+        pitfalls: [
+          `把现状直接当问题。比如“培训两周”“流程较多”“线上推广少”都只是现状，必须证明它带来了负面结果或不匹配研究目标。`,
+          `机械对标其它公司。不同公司行业、规模、岗位复杂度不同，不能因为别家公司做法不同就判定本公司有问题。`,
+          `材料只有学生个人感受，没有制度、访谈、问卷或业务数据支持。`,
+          `建议太空，如“加强管理”“提高重视”，没有说明谁来做、做什么、如何评价。`,
+          `问题、原因、对策三者不闭合。`
+        ],
+        output: [
+          `${subject}案例背景与选择理由`,
+          `${action}现状描述，但明确区分“事实”和“问题”`,
+          `问题证据表：现象、证据、后果、原因`,
+          `优化方案：措施、实施主体、资源条件、评价指标`
+        ]
+      };
+    }
+
+    function variableTopicDetail(title, subject, object, action, context) {
+      return {
+        summary: `该题目偏实证研究，核心不是描述${object}，而是检验${context}中变量之间是否存在稳定关系。`,
+        significance: `${title}的价值在于把一个管理或消费现象转化为可测量变量，并用数据检验变量关系。它能训练学生理解理论、量表、样本和统计结果之间的证据链。`,
+        questions: [
+          `自变量、因变量分别是什么，是否能从题目中清楚识别？`,
+          `研究对象是哪些${object}，为什么选择这个群体？`,
+          `变量关系为什么可能成立，能用什么理论解释？`,
+          `是否需要中介变量或调节变量来解释影响机制？`,
+          `统计结果最多能支持“相关或影响关系”，是否有足够条件讨论因果？`
+        ],
+        data: [
+          `成熟量表来源文献，尤其是核心变量的题项和信效度信息`,
+          `${object}问卷数据和基本人口统计信息`,
+          `变量测量题项、控制变量、样本筛选题`,
+          `必要时补充访谈，用于解释量化结果`
+        ],
+        methods: [
+          `文献分析：寻找变量定义、理论基础和成熟量表`,
+          `问卷调查：收集变量测量数据`,
+          `信度与效度检验：判断量表是否可用`,
+          `相关分析、回归分析或中介/调节分析：检验假设`
+        ],
+        pitfalls: [
+          `没有成熟量表来源就直接自编题项。`,
+          `样本只来自熟人，导致样本偏差明显。`,
+          `把“显著相关”写成“必然导致”。`,
+          `变量名称很学术，但问卷题项测不到这个变量。`,
+          `假设很多，但样本量和分析能力不足。`
+        ],
+        output: [
+          `变量定义表`,
+          `理论模型或变量关系图`,
+          `研究假设`,
+          `量表来源与问卷结构`,
+          `数据分析计划`
+        ]
+      };
+    }
+
+    function groupTopicDetail(title, subject, object, action, context) {
+      return {
+        summary: `该题目适合围绕${object}开展调查，重点是用数据说明该群体在${action}方面的现状、差异、原因和建议。`,
+        significance: `${title}的意义在于让学生用调查资料理解一个具体群体，而不是凭经验判断。研究价值取决于样本是否合理、调查维度是否贴合题目、结论是否能回到${object}。`,
+        questions: [
+          `${object}如何界定，调查范围是哪个学校、地区、平台或行业？`,
+          `要调查哪些维度：认知、态度、行为、满意度、困难、需求，还是影响因素？`,
+          `不同年级、岗位、消费频率、使用经验之间是否可能有差异？`,
+          `调查结果能支持什么改进建议？`,
+          `样本来源是否会导致便利样本偏差？`
+        ],
+        data: [
+          `${object}问卷数据`,
+          `基本信息和分组变量`,
+          `开放题反馈或访谈资料`,
+          `相关政策、平台资料或行业资料`
+        ],
+        methods: [
+          `描述统计：说明总体情况`,
+          `交叉分析或差异分析：比较不同群体`,
+          `访谈归纳：解释问卷背后的原因`,
+          `对策分析：从数据发现回到建议`
+        ],
+        pitfalls: [
+          `样本都来自一个班或朋友圈，却把结论推广到所有${object}。`,
+          `问卷只问态度，不问行为或原因。`,
+          `只罗列百分比，没有解释这些数据说明什么问题。`,
+          `把少数人的抱怨当成普遍问题。`
+        ],
+        output: [
+          `调查对象和样本说明`,
+          `调查维度表`,
+          `现状、差异、原因分析`,
+          `基于数据的建议`
+        ]
+      };
+    }
+
+    function reviewTopicDetail(title, subject, object, action, context) {
+      return {
+        summary: `该题目以已有文献为研究对象，重点是梳理${action || context}领域已有研究，而不是把文献摘要拼接起来。`,
+        significance: `${title}的价值在于帮助学生看清一个主题的研究脉络：研究者关注了什么问题，用了什么方法，得出了什么结论，还有哪些不足。`,
+        questions: [
+          `检索范围如何限定：时间、数据库、关键词、文献类型？`,
+          `已有研究可以分成哪些主题或流派？`,
+          `这些文献主要采用什么研究方法？`,
+          `主要结论是否一致，分歧在哪里？`,
+          `未来研究或本人论文可以从哪里切入？`
+        ],
+        data: [
+          `核心期刊论文、学位论文、综述文献`,
+          `检索式、筛选标准、题录和摘要`,
+          `文献阅读卡和文献矩阵`
+        ],
+        methods: [
+          `文献检索与筛选`,
+          `文献矩阵比较`,
+          `主题归纳`,
+          `方法和结论述评`
+        ],
+        pitfalls: [
+          `没有检索标准，随便找几篇文章就开始写。`,
+          `每段介绍一篇文献，缺少分类和比较。`,
+          `只说已有研究很多，没有指出不足和启发。`,
+          `引用不规范，正文引用与参考文献不对应。`
+        ],
+        output: [
+          `检索关键词和筛选标准`,
+          `文献矩阵`,
+          `主题分类框架`,
+          `研究述评和未来方向`
+        ]
+      };
+    }
+
+    function phenomenonTopicDetail(title, subject, object, action, context) {
+      return {
+        summary: `该题目关注${context}中的新现象，关键是把热点现象转化为可研究问题。`,
+        significance: `${title}的意义不在于追热点，而在于解释${context}如何影响${object}的认知、态度、行为或组织实践，并用证据支持判断。`,
+        questions: [
+          `${context}具体指什么场景，研究边界在哪里？`,
+          `它影响的是谁：${object}、企业、平台、游客还是消费者？`,
+          `影响路径可能是什么：信息刺激、信任、体验、感知价值、风险感知，还是资源配置？`,
+          `能收集哪些一手或二手证据？`,
+          `这个现象是短期热点，还是具有持续研究价值？`
+        ],
+        data: [
+          `平台公开资料、内容样本、评论样本或行业报告`,
+          `${object}问卷或访谈资料`,
+          `案例企业或平台运营资料`,
+          `相关政策和市场数据`
+        ],
+        methods: [
+          `调查研究：了解认知、态度和行为`,
+          `案例分析：解释平台或企业实践`,
+          `内容分析：分析短视频、直播或评论文本`,
+          `描述统计或交叉分析：呈现群体差异`
+        ],
+        pitfalls: [
+          `只描述热点，没有研究问题。`,
+          `把平台宣传材料当成客观证据。`,
+          `数据来源单一，无法支撑较大结论。`,
+          `结论推广过度，例如用少量大学生样本推断整个市场。`
+        ],
+        output: [
+          `现象界定和研究边界`,
+          `影响对象和影响路径`,
+          `数据来源清单`,
+          `分析框架`
+        ]
+      };
+    }
+
+    function generalTopicDetail(title, subject, object, action, context) {
+      return {
+        summary: `该题目可以作为起点，但还需要进一步明确${subject}、${object}和${action}之间的关系。`,
+        significance: `${title}的研究意义取决于它能否从具体对象中发现真实问题，并用合适证据形成解释或建议。`,
+        questions: [
+          `研究对象是谁，边界是否清楚？`,
+          `研究的是现状、问题、影响关系，还是优化方案？`,
+          `哪些资料可以证明这个问题值得研究？`,
+          `最终想产出什么结果：问题诊断、影响机制、优化方案，还是文献述评？`
+        ],
+        data: [
+          `文献资料`,
+          `问卷或访谈资料`,
+          `案例材料`,
+          `公开数据或内部资料`
+        ],
+        methods: [
+          `文献分析`,
+          `问卷调查`,
+          `访谈法`,
+          `案例分析`
+        ],
+        pitfalls: [
+          `题目只有大方向，没有研究对象。`,
+          `现状、问题和原因混在一起。`,
+          `方法和题目不匹配。`,
+          `没有数据来源设想。`
+        ],
+        output: [
+          `题目收窄版本`,
+          `研究对象说明`,
+          `研究问题`,
+          `资料来源和方法选择`
+        ]
+      };
+    }
+
+    function topicWorkHtml() {
+      return `
+        <h3>形成候选题目</h3>
+        <p class="hint">这里要求学生手动输入自己初步拟定的题目。AI 不替学生写论文，只对题目是否可研究、是否有证据支撑、后续该怎么推进作简洁诊断。</p>
+        <div class="grid">
+          <div class="panel span-12">
+            <div class="field"><label>你初步拟定的题目</label><textarea id="topicDraft" placeholder="请手动输入题目，例如：某公司新员工培训体系优化研究"></textarea></div>
+            <button class="btn primary" id="topicCoachBtn">AI 生成导师式题目诊断</button>
+          </div>
+          <div class="panel span-12">
+            <h3>导师式反馈</h3>
+            <textarea id="topicCoachResult" class="coach-output" readonly>等待生成。</textarea>
+          </div>
+        </div>`;
+    }
+
+    function wireTopicWork() {
+      document.getElementById("topicCoachBtn").addEventListener("click", async () => {
+        const draft = document.getElementById("topicDraft").value.trim();
+        const box = document.getElementById("topicCoachResult");
+        if (!draft) {
+          box.value = "请先手动输入“你初步拟定的题目”。";
+          return;
+        }
+        box.value = "正在生成导师式题目诊断...";
+        try {
+          const content = await callModel(`请对学生初步拟定的本科毕业论文题目进行简洁的导师式诊断。
+项目档案：${JSON.stringify(project, null, 2)}
+学生题目：${draft}
+
+请严格按以下9项输出，语言简洁，不要写成冗长大段，不要模仿“学生喂给AI让AI代写”的口吻：
+1. 题目范围是否适中：如果过大，给出2-3个更合适的题目。
+2. 难度判断：说明对本科生是否过难，难点在哪里。
+3. 研究意义：说明是否有研究意义，意义来自哪里。
+4. 文献收集整理：必须收集哪些类型文献；关键词包括哪些；建议在哪些平台检索。
+5. 数据支撑：最低要求的数据支撑包括哪些；最佳的数据支撑建议是什么。
+6. 论文主要结构：给出适合该题目的主要章节结构。
+7. 问卷与成熟量表：如果需要问卷调研，推荐可检索的成熟量表名称、来源线索或检索链接；不要编造无法核验的具体文献。
+8. 问卷样本量与偏差：给出基于统计规则的基本样本量要求；说明问卷发放如何避免幸存者偏差和便利样本偏差。
+9. 避免把现状当问题：结合该题目说明如何判断“现状”是否真的是“问题”。
+
+如果题目属于变量关系实证型，例如“X对Y的影响”“X对Y的影响：Z的调节作用”“X、Y、Z之间关系研究”，请在上述9项之后追加“变量关系实证研究方法补充”，至少包括：
+A. 假设验证型：简要介绍；假设从理论、文献和变量逻辑中如何产生；如何提出H1、H2、H3；变量包括自变量、因变量、中介变量、调节变量、控制变量；基本分析步骤。
+B. 探索因子分析建模型型：简要介绍；适合什么情况；题项如何形成；探索因子分析的基本步骤；如何根据因子形成维度或模型；后续如何做信度、效度和回归/结构关系检验。
+C. 如题目包含调节作用或中介作用，请说明调节/中介的区别、需要收集的数据和基本检验思路。`);
+          box.value = content;
+          saveProject({ topic: draft, stage: "题目待审核", progress: Math.max(project.progress || 0, 25) });
+        } catch (error) {
+          box.value = buildTopicCoachFallback(draft, error.message);
+          saveProject({ topic: draft, stage: "题目待审核", progress: Math.max(project.progress || 0, 25) });
+        }
+      });
+    }
+
+    function buildTopicCoachFallback(draft, errorMessage) {
+      const needsQuestionnaire = /影响|关系|满意度|意愿|忠诚度|信任|投入|离职|行为|因素/.test(draft);
+      const isEmpiricalRelation = /影响|关系|作用|调节|中介|变量|信任|投入|满意度|意愿|忠诚度|离职倾向|创新行为/.test(draft);
+      const isCase = /某|公司|企业|景区|酒店|品牌|平台|优化|对策/.test(draft);
+      const scopeAdvice = draft.length > 28
+        ? "题目略长，建议保留研究对象、核心问题和研究结果，删去不必要背景词。"
+        : "题目范围初步可控，但还要确认研究对象、行业场景和数据来源。";
+      const alternatives = isCase
+        ? ["某公司新员工培训体系存在问题及优化研究", "某公司新员工岗位适应培训效果提升研究", "某公司新员工培训内容与岗位胜任匹配研究"]
+        : ["某群体某行为现状及影响因素研究", "某因素对某结果变量的影响研究", "某场景下某群体需求调查研究"];
+      return `1. 题目范围是否适中
+${scopeAdvice}
+可参考收窄题目：
+${alternatives.map((item, index) => `${index + 1}. ${item}`).join("\n")}
+
+2. 难度判断
+本科可做。难点在于不能只写感受，必须拿出文献、问卷、访谈、案例材料或二手数据支撑判断。
+
+3. 研究意义
+如果能说明该题目涉及真实管理问题、消费行为变化、服务改进或组织优化，并能取得证据，就有研究意义。
+
+4. 文献收集整理
+文献类型：概念界定类、理论基础类、同类题目实证或案例类、研究方法类。
+关键词：题目核心词、研究对象、行业场景、影响因素、优化、问卷、量表。
+平台：知网、万方、维普、学校图书馆数据库、Google Scholar、百度学术。
+
+5. 数据支撑
+最低要求：至少有文献依据、研究对象基本资料、问卷或访谈中的一种主要证据。
+最佳建议：文献 + 问卷 + 访谈/案例资料 + 必要业务数据，形成交叉验证。
+
+6. 论文主要结构
+绪论；文献综述与理论基础；研究设计；现状或数据分析；问题与原因；建议；结论。
+
+7. 问卷与成熟量表
+${needsQuestionnaire ? "建议优先检索成熟量表，不要直接自编。可检索：变量名 + 量表、变量名 + 问卷、变量名 + 信度效度、变量名 + 实证研究。检索平台：知网、万方、Google Scholar。若涉及满意度，可查顾客满意度量表；涉及信任，可查信任量表；涉及购买意愿，可查购买意愿量表；涉及工作投入，可查工作投入量表。" : "如果后续需要问卷，先明确变量或调查维度，再查找成熟量表或同类问卷。"}
+
+8. 问卷样本量与偏差
+基本要求：描述性调查建议不少于100份有效问卷；变量关系或回归分析建议不少于150-200份，且每个变量题项数量不能过多。
+避免偏差：不要只发给熟人、同班同学或已经成功留下来的对象；要覆盖不同年级、岗位、使用频率、入职批次或消费经验群体，特别注意不要只调查“留下来的人”而忽略已经离职、放弃、投诉或未购买的人。
+
+9. 避免把现状当问题
+现状本身不是问题。只有当现状与目标、标准、行业特征、岗位要求或结果数据发生冲突时，才可能成为问题。例如“培训两周”只是事实；如果证据显示培训后仍不能胜任岗位，再去分析培训时长、内容、方式或考核是否构成问题。
+
+${isEmpiricalRelation ? empiricalMethodSupplement(draft) : ""}
+
+当前未调用模型：${errorMessage}`;
+    }
+
+    function empiricalMethodSupplement(draft) {
+      const hasModerator = /调节/.test(draft);
+      const hasMediator = /中介/.test(draft);
+      return `变量关系实证研究方法补充
+
+A. 假设验证型
+简要介绍：先根据理论和已有文献提出变量关系假设，再用问卷或二手数据检验假设是否成立。
+假设如何产生：不能凭感觉提出，应来自理论逻辑、已有文献结论和现实情境。例如“亲和型领导可能提升员工工作投入”，需要说明领导行为如何影响员工情绪、认同或工作资源。
+如何提出假设：H1：X对Y有显著正向/负向影响；H2：M在X与Y之间起中介作用；H3：Z调节X与Y之间关系。
+变量包括：自变量X、因变量Y、中介变量M、调节变量Z、控制变量，如性别、年龄、岗位、工龄、教育程度等。
+分析步骤：文献梳理和量表选择；问卷设计；预测试；正式发放；数据清洗；信度效度检验；描述统计；相关分析；回归分析；中介或调节检验；解释结果。
+
+B. 探索因子分析建模型型
+简要介绍：当学生还不清楚某个概念包含哪些维度时，可以通过题项收集数据，再用探索因子分析提取潜在维度。
+适合情况：研究某类能力、满意度、服务质量、培训效果、体验感知等多维概念，但现有维度不完全适配具体场景。
+题项形成：来自成熟量表、文献维度、访谈材料和情境改写，不能随意编题。
+基本步骤：形成题项池；小样本预测试；正式问卷；KMO和Bartlett检验；提取因子；旋转解释；删除低载荷或交叉载荷题项；命名维度；信度检验。
+后续分析：用形成的因子维度做描述统计、差异分析、相关分析、回归分析或结构关系检验。
+
+C. 调节/中介说明
+${hasModerator ? "调节作用：说明Z会改变X影响Y的强弱或方向。例如员工积极情绪可能增强或削弱某策略对信任修复的影响。需要收集X、Y、Z的量表数据，并检验交互项。" : "如果题目出现调节变量，要说明该变量如何改变X与Y关系的强弱或方向，并检验交互项。"}
+${hasMediator ? "中介作用：说明X先影响M，再由M影响Y。需要解释影响路径，并用中介效应检验判断间接效应是否成立。" : "如果题目出现中介变量，要说明X通过什么机制影响Y，并检验间接效应。"}
+样本提醒：变量关系模型通常需要较大样本，基础回归建议不少于150-200份；变量和题项较多时应提高样本量。`;
+    }
+
+    function topicSubmitHtml() {
+      return `
+        <h3>提交教师审核</h3>
+        <p class="hint">提交前，学生需要说明题目的研究对象、研究问题、数据来源和可能风险。教师端后续可以审核、修改或退回。</p>
+        <div class="result">当前题目：${project.topic || "未确定"}
+专业：${project.major || "未选择"}
+题目类型：${project.topicCategory || "未选择"}
+当前阶段：${project.stage || "选题中"}</div>
+        <div class="field" style="margin-top:14px;"><label>提交说明</label><textarea id="topicSubmitNote" placeholder="请说明：我研究什么对象、想解决什么问题、准备收集什么证据。"></textarea></div>
+        <button class="btn primary" id="submitTopicBtn">提交题目给教师</button>
+        <div id="topicSubmitResult" class="notice" style="margin-top:14px;">尚未提交。</div>`;
+    }
+
+    function wireTopicSubmit() {
+      document.getElementById("submitTopicBtn").addEventListener("click", () => {
+        saveProject({ stage: "题目已提交教师审核", progress: Math.max(project.progress || 0, 30) });
+        document.getElementById("topicSubmitResult").className = "notice ok";
+        document.getElementById("topicSubmitResult").textContent = "已在本地记录提交状态。后续接入云函数后，会写入 COS 并出现在教师端审核中心。";
+      });
+    }
+
+    function renderStudentAssistant(id, subs) {
+      document.getElementById(id).innerHTML = shellWithSubnav(id, moduleMeta[id][0], subs.map((s) => [s.id, s.label]));
+      setGenericSubContent(id, subs[0]);
+      document.querySelectorAll(`.sub-btn[data-module="${id}"]`).forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(`.sub-btn[data-module="${id}"]`).forEach((item) => item.classList.remove("active"));
+          btn.classList.add("active");
+          setGenericSubContent(id, subs.find((s) => s.id === btn.dataset.sub));
+        });
+      });
+    }
+
+    function setGenericSubContent(id, sub) {
+      document.getElementById(`${id}WorkArea`).innerHTML = `
+        <h3>${sub.label}</h3>
+        <div class="grid">
+          <div class="panel span-6"><h3>是什么</h3><p class="hint">${sub.what}</p></div>
+          <div class="panel span-6"><h3>为什么要做</h3><p class="hint">${sub.why}</p></div>
+          <div class="panel span-6"><h3>怎么做</h3><p class="hint">${sub.how}</p></div>
+          <div class="panel span-6"><h3>常见坑</h3><p class="hint">${sub.pitfalls}</p></div>
+          <div class="panel span-12"><h3>本步产出</h3><div class="result">${sub.output}</div></div>
+        </div>`;
+    }
+
+    function literatureSubmodules() {
+      return [
+        { id: "learn", label: "文献是什么", what: "文献是已有研究证据，不是写作素材仓库。", why: "帮助学生知道别人研究了什么、怎么研究、还留下什么问题。", how: "检索、筛选、阅读、做阅读卡和文献矩阵。", pitfalls: "只复制摘要；只堆文献；不比较方法和结论。", output: "检索关键词、文献清单、阅读卡、文献矩阵。" },
+        { id: "search", label: "检索关键词", what: "把题目拆成概念、对象、场景和方法关键词。", why: "关键词决定能否找到高相关文献。", how: "中文关键词、英文关键词、同义词组合检索。", pitfalls: "只用一个词检索；文献过旧；来源不可靠。", output: "关键词组合和检索记录。" },
+        { id: "matrix", label: "文献矩阵", what: "用表格比较文献。", why: "帮助学生从单篇阅读进入整体综述。", how: "记录作者、对象、方法、数据、结论、局限。", pitfalls: "表格只有摘要，没有评价。", output: "文献矩阵表。" }
+      ];
+    }
+
+    function outlineSubmodules() {
+      return [
+        { id: "learn", label: "提纲是什么", what: "提纲是论文的研究路线图。", why: "不同论文类型需要不同结构。", how: "根据题目、类型、方法和证据安排章节。", pitfalls: "章节顺序混乱；提纲与题目不匹配。", output: "二级标题提纲和每章任务。" },
+        { id: "generate", label: "生成提纲", what: "根据前面信息生成初稿。", why: "让学生知道论文各章分别解决什么问题。", how: "AI 生成后学生解释，教师审核。", pitfalls: "直接照搬模板。", output: "建议提纲。" },
+        { id: "revise", label: "修改提纲", what: "对已有提纲做结构诊断。", why: "保证结构支撑研究结果。", how: "检查缺章、重章、顺序和逻辑。", pitfalls: "只有标题，没有每章任务。", output: "修改版提纲和修改理由。" }
+      ];
+    }
+
+    function methodSubmodules() {
+      return [
+        { id: "learn", label: "方法是什么", what: "研究方法是收集证据的方式。", why: "方法必须能回答研究问题。", how: "根据论文类型选择问卷、访谈、案例、二手数据或文献研究。", pitfalls: "先发问卷再想研究问题。", output: "方法选择说明。" },
+        { id: "match", label: "方法匹配", what: "判断题目和方法是否匹配。", why: "避免数据无法支撑结论。", how: "看研究问题、对象、变量、资料条件。", pitfalls: "方法听起来高级但不可执行。", output: "方法方案和风险提醒。" },
+        { id: "tool", label: "工具设计", what: "把方法转化为问卷、访谈提纲或资料清单。", why: "工具决定收集到什么信息。", how: "变量对应题项，问题对应访谈主题。", pitfalls: "题项和研究目标无关。", output: "研究工具草案。" }
+      ];
+    }
+
+    function collectionSubmodules() {
+      return [
+        { id: "plan", label: "获取计划", what: "明确要收集什么数据或资料。", why: "证据链从数据获取开始。", how: "列出来源、对象、字段、时间和伦理说明。", pitfalls: "样本只来自熟人；没有知情同意。", output: "数据获取计划。" },
+        { id: "questionnaire", label: "问卷数据", what: "用问卷测量变量或调查现状。", why: "适合量化描述和变量关系检验。", how: "优先找成熟量表，再做场景化改写。", pitfalls: "自编题项无依据。", output: "问卷结构和量表检索方向。" },
+        { id: "interview", label: "访谈资料", what: "用开放问题理解经验、原因和机制。", why: "适合解释复杂现象。", how: "确定访谈对象、提纲和记录方式。", pitfalls: "只问是或否；问题诱导。", output: "访谈提纲。" }
+      ];
+    }
+
+    function analysisSubmodules() {
+      return [
+        { id: "clean", label: "数据清洗", what: "检查数据是否可用。", why: "脏数据会导致错误结论。", how: "检查缺失、重复、异常和无效样本。", pitfalls: "不说明删除标准。", output: "数据清洗报告。" },
+        { id: "quant", label: "量化分析", what: "用统计方法回答研究问题。", why: "让数据支撑结论。", how: "描述统计、交叉分析、相关、回归、信效度。", pitfalls: "相关写成因果；过度解释。", output: "统计结果和图表。" },
+        { id: "evidence", label: "证据链", what: "把分析结果对应到研究问题。", why: "论文价值来自证据支持的判断。", how: "每个图表说明回答哪个问题。", pitfalls: "图表很多但没有结论。", output: "证据链说明。" }
+      ];
+    }
+
+    function renderSubmissions() {
+      document.getElementById("submissions").innerHTML = `
+        <div class="panel"><h3>我的提交</h3><div class="table-wrap"><table>
+        <thead><tr><th>材料</th><th>状态</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>题目</td><td>${project.stage || "选题中"}</td><td>${project.topic || "尚未确定题目"}</td></tr>
+          <tr><td>提纲</td><td>${project.outline ? "已保存" : "未提交"}</td><td>后续接入 COS 后保存版本。</td></tr>
+          <tr><td>开题报告</td><td>未提交</td><td>后续支持上传文件。</td></tr>
+          <tr><td>初稿</td><td>未提交</td><td>后续支持上传文件。</td></tr>
+          <tr><td>修改稿</td><td>未提交</td><td>后续支持上传文件。</td></tr>
+        </tbody></table></div></div>`;
+    }
+
+    function renderComments() {
+      document.getElementById("comments").innerHTML = `<div class="panel"><h3>教师意见</h3><div class="result">暂无教师意见。后续云函数接入后，将从 COS 读取教师对题目、提纲、开题报告、初稿和修改稿的审核意见。</div></div>`;
+    }
+
+    function renderTeacherModules() {
+      const students = [
+        ["张三", "人力资源管理", "亲和型领导对员工工作投入的影响研究", "题目待审核", "30%"],
+        ["李四", "市场营销", "直播电商情境下消费者冲动购买行为研究", "提纲待审核", "42%"],
+        ["王五", "旅游管理", "游客满意度对重游意愿的影响研究", "文献阅读中", "36%"]
+      ];
+      document.getElementById("teacherOverview").innerHTML = `<div class="panel"><h3>学生进度总览</h3><div class="table-wrap"><table><thead><tr><th>学生</th><th>专业</th><th>题目</th><th>状态</th><th>进度</th></tr></thead><tbody>${students.map((s) => `<tr>${s.map((v) => `<td>${escapeHtml(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></div></div>`;
+      document.getElementById("teacherReview").innerHTML = `<div class="panel"><h3>审核中心</h3><p class="hint">教师可审核、修改学生题目、提纲、开题报告、初稿和修改稿。当前为前端占位，后续通过云函数读写 COS。</p><div class="result">待审核：题目 1 项；提纲 1 项；初稿 0 项。</div><div class="field" style="margin-top:14px;"><label>审核意见</label><textarea placeholder="输入给学生的修改建议。"></textarea></div><button class="btn primary">保存审核意见</button></div>`;
+      document.getElementById("teacherStudent").innerHTML = `<div class="panel"><h3>学生档案</h3><div class="result">点击学生后，可查看其选题、提纲、开题报告、初稿、修改稿、AI 记录和教师意见。后续接入 COS 后读取真实学生档案。</div></div>`;
+      document.getElementById("teacherMessage").innerHTML = `<div class="panel"><h3>意见通知</h3><div class="field"><label>通知内容</label><textarea placeholder="输入发给学生的意见或班级通知。"></textarea></div><button class="btn primary">发送通知</button></div>`;
+    }
+
+    function checkedValues(scope) {
+      return Array.from(document.querySelectorAll(`${scope} input:checked`)).map((item) => item.value);
+    }
+
+    function escapeHtml(text) {
+      return String(text || "").replace(/[&<>"']/g, (char) => {
+        const map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" };
+        return map[char];
+      });
+    }
+  </script>
+</body>
+</html>
