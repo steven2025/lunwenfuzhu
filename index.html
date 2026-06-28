@@ -735,6 +735,7 @@
 
   <script>
     const CLOUD_FUNCTION_URL = "https://1311686407-cg9lh2w33z.ap-guangzhou.tencentscf.com";
+    const PDF_SIGN_CACHE_VERSION = "inline-v2";
 
     const providerConfig = {
       deepseek: { baseUrl: "https://api.deepseek.com/v1/chat/completions", model: "deepseek-chat" },
@@ -1264,7 +1265,7 @@
       const major = project.major || "人力资源管理";
       return `
         <h3>往届优秀论文展示</h3>
-        <p class="hint">样本论文用于帮助学生理解“优秀论文如何组织题目、文献、方法、数据和结论”。PDF 可直接用 COS 链接预览；若浏览器不支持内嵌预览，可点击新窗口打开。</p>
+        <p class="hint">样本论文用于帮助学生理解“优秀论文如何组织题目、文献、方法、数据和结论”。PDF 通过云函数生成临时阅读链接，避免 COS 权限导致无法访问。</p>
         <div class="paper-toolbar">
           <div class="field" style="min-width:220px;"><label>专业</label><select id="paperMajor">${Object.keys(topicBank).map((m) => `<option value="${m}" ${m === major ? "selected" : ""}>${m}</option>`).join("")}</select></div>
           <div class="field" style="min-width:240px;"><label>论文类型</label><select id="paperType">${paperTypes().map((t) => `<option value="${t}">${t}</option>`).join("")}</select></div>
@@ -1293,6 +1294,9 @@
         document.querySelectorAll("[data-preview-paper]").forEach((btn) => {
           btn.addEventListener("click", () => openPaperPreview(excellentPapers.find((p) => p.id === btn.dataset.previewPaper)));
         });
+        document.querySelectorAll("[data-open-paper]").forEach((btn) => {
+          btn.addEventListener("click", () => openPaperInNewTab(excellentPapers.find((p) => p.id === btn.dataset.openPaper)));
+        });
         document.querySelectorAll("[data-analyze-paper]").forEach((btn) => {
           btn.addEventListener("click", () => handleAnalyzePaper(excellentPapers.find((p) => p.id === btn.dataset.analyzePaper)));
         });
@@ -1319,12 +1323,26 @@
           <div>${paper.tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>
           <div class="row" style="margin-top:10px;">
             <button class="btn primary" data-preview-paper="${paper.id}">点击预览</button>
+            <button class="btn" data-open-paper="${paper.id}">直接阅读PDF</button>
             <button class="btn" data-analyze-paper="${paper.id}">AI 拆解论文</button>
           </div>
         </div>`;
     }
 
-    function openPaperPreview(paper) {
+    async function openPaperInNewTab(paper) {
+      if (!paper?.pdfUrl) {
+        alert("PDF 链接尚未配置。");
+        return;
+      }
+      try {
+        const url = await getPaperReadUrl(paper);
+        window.open(url, "_blank", "noopener");
+      } catch (error) {
+        alert("PDF 阅读链接生成失败：" + error.message);
+      }
+    }
+
+    async function openPaperPreview(paper) {
       const box = document.getElementById("paperPreview");
       document.getElementById("paperPreviewTitle").textContent = paper.title;
       const body = document.getElementById("paperPreviewBody");
@@ -1333,8 +1351,23 @@
         body.innerHTML = `<div class="notice warn" style="margin:16px;">PDF 样本论文链接待配置。上传至腾讯云 COS 后，可将链接填入该论文的 pdfUrl 字段。</div>`;
         return;
       }
-      const url = paper.pdfUrl;
-      body.innerHTML = `<div class="preview-actions"><a class="btn primary" href="${escapeHtml(url)}" target="_blank" rel="noopener">新窗口打开PDF</a><span class="hint">COS 已设置公有读；若下方空白，请用新窗口打开。</span></div><object data="${escapeHtml(url)}#toolbar=1" type="application/pdf"><iframe src="${escapeHtml(url)}"></iframe></object>`;
+      body.innerHTML = `<div class="notice" style="margin:16px;">正在生成 PDF 临时阅读链接...</div>`;
+      try {
+        const url = await getPaperReadUrl(paper);
+        body.innerHTML = `<div class="preview-actions"><a class="btn primary" href="${escapeHtml(url)}" target="_blank" rel="noopener">新窗口打开PDF</a><span class="hint">临时链接约1小时有效；若下方空白，请用新窗口打开。</span></div><object data="${escapeHtml(url)}#toolbar=1" type="application/pdf"><iframe src="${escapeHtml(url)}"></iframe></object>`;
+      } catch (error) {
+        body.innerHTML = `<div class="notice warn" style="margin:16px;">PDF 阅读链接生成失败：${escapeHtml(error.message)}。请确认云函数已部署最新 index.js，且 COS_SECRET_ID / COS_SECRET_KEY 对该桶有 GetObject 权限。</div>`;
+      }
+    }
+
+    async function getPaperReadUrl(paper) {
+      const cacheKey = `paperSignedUrl:${PDF_SIGN_CACHE_VERSION}:${paper.id}`;
+      const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
+      if (cached?.url && cached.expiresAt > Date.now() + 60000) return cached.url;
+      const result = await callCloudFunction("getPdfSignedUrl", { pdfUrl: paper.pdfUrl, expires: 3600 });
+      const url = result.url;
+      localStorage.setItem(cacheKey, JSON.stringify({ url, expiresAt: Date.now() + 50 * 60 * 1000 }));
+      return url;
     }
 
     function wireFloatingPreview() {
