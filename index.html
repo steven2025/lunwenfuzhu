@@ -89,7 +89,7 @@
 
     .app {
       display: grid;
-      grid-template-columns: 280px minmax(0, 1fr);
+      grid-template-columns: 220px minmax(0, 1fr);
       min-height: 100vh;
     }
 
@@ -97,7 +97,7 @@
       background:
         linear-gradient(180deg, #17213a 0%, var(--side) 52%, #0d1324 100%);
       color: #e5edf7;
-      padding: 18px 14px;
+      padding: 16px 10px;
       position: sticky;
       top: 0;
       height: 100vh;
@@ -111,7 +111,7 @@
       margin-bottom: 12px;
     }
 
-    .brand h1 { margin: 0 0 8px; font-size: 18px; line-height: 1.35; }
+    .brand h1 { margin: 0 0 8px; font-size: 16px; line-height: 1.35; }
     .brand p { margin: 0; color: #aebbd0; font-size: 13px; line-height: 1.6; }
 
     .nav-title {
@@ -134,11 +134,18 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 10px;
+      padding: 9px 8px;
       margin-bottom: 3px;
     }
 
     .nav-btn:hover { background: rgba(255, 255, 255, 0.08); }
+    .nav-btn.locked {
+      color: #738198;
+      cursor: not-allowed;
+      opacity: 0.55;
+      filter: grayscale(0.45);
+    }
+    .nav-btn.locked:hover { background: transparent; }
     .nav-btn.active {
       background: linear-gradient(135deg, var(--brand), #0e7490);
       color: #fff;
@@ -146,14 +153,14 @@
     }
     .nav-icon { width: 24px; flex: 0 0 24px; text-align: center; font-size: 12px; color: inherit; opacity: .9; }
 
-    .main { min-width: 0; padding: 22px; }
+    .main { min-width: 0; padding: 18px 20px; }
 
     .devbar {
       background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 58%, #0e7490 100%);
       color: #fff;
       border-radius: var(--radius);
       padding: 10px 14px;
-      margin-bottom: 14px;
+      margin-bottom: 10px;
       display: flex;
       justify-content: space-between;
       gap: 12px;
@@ -624,9 +631,9 @@
       display: inline-block;
       white-space: nowrap;
       padding: 10px 0;
-      font-size: 15px;
+      font-size: 30px;
       font-weight: 800;
-      animation: noticeScroll 22s linear infinite;
+      animation: noticeScroll 24s linear infinite;
     }
 
     @keyframes noticeScroll {
@@ -757,7 +764,7 @@
 
       <div id="studentNoticeTicker" class="notice-ticker hidden"><div class="notice-track" id="studentNoticeText"></div></div>
 
-      <div class="project-strip" id="projectStrip"></div>
+      <div class="project-strip hidden" id="projectStrip"></div>
 
       <section id="home" class="module active"></section>
       <section id="model" class="module"></section>
@@ -1078,7 +1085,11 @@
       const openModules = adminSettings.openModules || defaultAdminSettings.openModules;
       studentModuleList.forEach(([id]) => {
         const btn = document.querySelector(`#studentNav [data-target="${id}"]`);
-        if (btn) btn.classList.toggle("hidden", openModules[id] === false);
+        if (!btn) return;
+        const locked = openModules[id] === false;
+        btn.classList.toggle("locked", locked);
+        btn.disabled = locked;
+        btn.title = locked ? "该模块暂未开放" : "";
       });
     }
 
@@ -1106,10 +1117,16 @@
     window.addEventListener("beforeunload", () => recordUsageDuration());
 
     document.querySelectorAll(".nav-btn").forEach((btn) => {
-      btn.addEventListener("click", () => activateModule(btn.dataset.target));
+      btn.addEventListener("click", () => {
+        if (btn.disabled || btn.classList.contains("locked")) return;
+        activateModule(btn.dataset.target);
+      });
     });
 
     function activateModule(target) {
+      const currentUser = JSON.parse(localStorage.getItem("thesisUser") || "null");
+      const openModules = adminSettings.openModules || defaultAdminSettings.openModules;
+      if (currentUser?.role === "student" && openModules[target] === false) return;
       document.querySelectorAll(".nav-btn").forEach((item) => item.classList.toggle("active", item.dataset.target === target));
       document.querySelectorAll(".module").forEach((item) => item.classList.toggle("active", item.id === target));
       document.getElementById("pageTitle").textContent = moduleMeta[target][0];
