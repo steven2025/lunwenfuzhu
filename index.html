@@ -3173,7 +3173,7 @@ JSON字段：
         const docs = literatureItems().filter((item) => selected.includes(item.id));
         output.textContent = "正在测试文献匹配度...";
         try {
-          const content = await callModel(literatureMatchPrompt(topic, docs), "你是本科论文文献筛选指导教师。请用中文给出清晰、可执行的判断。");
+          const content = await callModel(literatureMatchPrompt(topic, docs), "你是本科论文文献筛选指导教师。请只保留要点，用短句给出清晰、可执行的判断。");
           output.textContent = content;
           localStorage.setItem("literatureMatchResult", content);
           syncCloud("saveLiteratureMatch", { topic, docs, content });
@@ -3193,11 +3193,18 @@ JSON字段：
 论文题目：${topic}
 文献列表：${docs.map((d, i) => `${i + 1}. ${d.title}（${d.author || "作者待识别"}）`).join("\n")}
 
-请输出：
-1. 单篇匹配度评价：逐篇评价与题目整体及题目关键词的匹配程度。
-2. 可用于论文哪一部分：概念界定/理论基础/研究假设/方法参考/背景说明/对策建议等。
-3. 引用优先级：重点引用、其次引用、可以不考虑。
-4. 总体建议：目前文献组合还缺什么类型文献。`;
+请严格按“要点版”输出，避免长段解释：
+一、逐篇判断
+用表格呈现，每篇只写一行，列名为：编号｜匹配度｜匹配理由｜可用于论文部分｜引用优先级｜处理建议。
+要求：
+1. 匹配度只用：高 / 中 / 低。
+2. 匹配理由不超过25字，必须指出和题目哪一个关键词或研究对象有关。
+3. 可用于论文部分只选1-2项：概念界定、理论基础、研究假设、研究方法、背景说明、对策建议、结果讨论。
+4. 引用优先级只用：重点引用 / 次要引用 / 暂不引用。
+5. 处理建议不超过20字。
+
+二、总体建议
+只列3-5条，每条不超过35字，说明目前还缺哪类文献。不要展开写作。`;
     }
 
     function simpleHash(text) {
