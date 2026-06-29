@@ -414,6 +414,24 @@
       white-space: pre-wrap;
     }
 
+    .paper-analysis-content {
+      border: 1px dashed #b7c2d6;
+      border-radius: var(--radius);
+      padding: 8px 10px 10px;
+      background: #fbfcfe;
+      min-height: 0;
+    }
+
+    .paper-analysis-text {
+      border: 1px dashed #b7c2d6;
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      background: #fff;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      min-height: 0;
+    }
+
     .coach-output {
       width: 100%;
       min-height: 420px;
@@ -584,6 +602,33 @@
       margin-bottom: 12px;
     }
 
+    .paper-title-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    .paper-title-btn {
+      line-height: 1.25;
+      padding: 7px 10px;
+      max-width: 360px;
+      white-space: normal;
+      color: #1d4ed8;
+      border-color: #bfdbfe;
+      background: linear-gradient(180deg, #ffffff, #eff6ff);
+    }
+
+    .paper-action-panel {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border: 1px solid #dbeafe;
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, #f8fbff, #ffffff);
+    }
+
+    .paper-action-panel h3 { margin-bottom: 6px; }
+
     .paper-group summary {
       font-weight: 800;
       color: #0f172a;
@@ -601,19 +646,19 @@
       gap: 6px;
       flex-wrap: nowrap;
       overflow-x: auto;
-      padding-bottom: 4px;
-      margin: 0 0 8px;
+      padding-bottom: 2px;
+      margin: 0 0 4px;
     }
 
     .analysis-tabs .btn {
-      min-height: 30px;
-      padding: 5px 8px;
+      min-height: 26px;
+      padding: 3px 7px;
       font-size: 12px;
       white-space: nowrap;
     }
 
     .analysis-panel {
-      margin-top: 6px;
+      margin-top: 2px;
       line-height: 1.7;
     }
 
@@ -1370,23 +1415,221 @@
 
     function topicReferencesHtml() {
       const major = project.major || "人力资源管理";
+      const categories = paperTypes();
       return `
         <h3>分类参考题目</h3>
-        <p class="hint">参考题目不是让学生照抄，而是帮助学生理解不同题目背后的研究结果、数据要求和方法路径。点击题目可展开抽屉详情。</p>
-        <div class="field"><label>当前专业</label><select id="referenceMajor">${Object.keys(topicBank).map((m) => `<option value="${m}" ${m === major ? "selected" : ""}>${m}</option>`).join("")}</select></div>
-        <div id="referenceDrawers"></div>`;
+        <div class="field" style="max-width:320px;"><label>当前专业</label><select id="referenceMajor">${Object.keys(topicBank).map((m) => `<option value="${m}" ${m === major ? "selected" : ""}>${m}</option>`).join("")}</select></div>
+        <div class="analysis-tabs" id="referenceTypeTabs">
+          ${categories.map((category, index) => `<button class="btn ${index === 0 ? "primary" : ""}" data-reference-type="${category}">${category}</button>`).join("")}
+        </div>
+        <div class="analysis-tabs" id="referenceModeTabs">
+          <button class="btn primary" data-reference-mode="definition">定义</button>
+          <button class="btn" data-reference-mode="topics">参考题目拆解</button>
+        </div>
+        <div id="referenceWorkArea"></div>`;
     }
 
     function wireTopicReferences() {
       const select = document.getElementById("referenceMajor");
-      const render = () => {
+      let activeType = paperTypes()[0];
+      let activeMode = "definition";
+      const render = (selectedTitle = "") => {
         const major = select.value;
-        document.getElementById("referenceDrawers").innerHTML = Object.entries(topicBank[major]).map(([category, topics]) => {
-          return `<details class="drawer"><summary>${category}</summary><div class="drawer-body">${topics.map((title) => renderTopicRow(major, category, title)).join("")}</div></details>`;
-        }).join("");
+        document.querySelectorAll("[data-reference-type]").forEach((btn) => btn.classList.toggle("primary", btn.dataset.referenceType === activeType));
+        document.querySelectorAll("[data-reference-mode]").forEach((btn) => btn.classList.toggle("primary", btn.dataset.referenceMode === activeMode));
+        document.getElementById("referenceWorkArea").innerHTML = activeMode === "definition"
+          ? renderTypeGuide(activeType)
+          : renderReferenceTopicPicker(major, activeType, selectedTitle);
+        document.querySelectorAll("[data-reference-topic]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            document.getElementById("referenceTopicDetail").innerHTML = renderReferenceTopicDetail(major, activeType, btn.dataset.referenceTopic);
+            document.querySelectorAll("[data-reference-topic]").forEach((item) => item.classList.toggle("primary", item === btn));
+          });
+        });
       };
       select.addEventListener("change", render);
+      document.querySelectorAll("[data-reference-type]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          activeType = btn.dataset.referenceType;
+          render();
+        });
+      });
+      document.querySelectorAll("[data-reference-mode]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          activeMode = btn.dataset.referenceMode;
+          render();
+        });
+      });
       render();
+    }
+
+    function paperTypeGuide(category) {
+      const guides = {
+        问题诊断与优化型: {
+          oneLine: "先证明问题真的存在，再分析原因，最后提出对策。",
+          plain: "这类论文不是一上来写“怎么改”，而是先判断某个单位、群体或场景里有没有一个真实问题。你要证明问题存在，分析原因，再提出改进建议。",
+          start: [
+            "先找一个具体对象：某公司、某景区、某品牌、某学校学生群体或某个平台。",
+            "再问：这里有什么现象？这个现象为什么算问题？它会带来什么影响？",
+            "最后想：我能用哪些问卷、访谈、企业资料或公开资料证明这个问题？"
+          ],
+          caseTitle: "A公司Z世代员工敬业度的影响因素及提升策略研究",
+          caseRead: "这个题目不是泛泛写“Z世代员工不好管”，而是研究A公司Z世代员工敬业度目前怎么样、哪些因素影响敬业度、哪些因素是A公司真正需要改进的。",
+          breakdown: [
+            "研究对象：A公司Z世代员工。",
+            "核心问题：敬业度是否存在不足，影响因素是什么。",
+            "主要产出：敬业度现状判断、影响因素识别、提升策略。",
+            "判断标准：必须用数据证明“这确实是问题”，不能只凭个人感觉。"
+          ],
+          data: [
+            "问卷数据：调查敬业度、组织支持、薪酬满意度、职业发展感知等。",
+            "访谈数据：访谈Z世代员工、直属主管、人力资源部门，了解具体表现和原因。",
+            "企业资料：员工流失率、考勤、绩效评价、培训记录、员工活动资料等。",
+            "对比资料：同行业青年员工管理、敬业度提升公开案例。"
+          ],
+          pitfalls: [
+            "把现状直接写成问题。例如“培训时间两周”只是现状，不一定是问题。",
+            "只写对策，不证明问题和原因。",
+            "对策和前文数据没有对应关系。"
+          ]
+        },
+        变量关系验证型: {
+          oneLine: "先找变量，再提假设，最后用数据验证关系。",
+          plain: "这类论文研究几个因素之间有没有关系。你要先根据理论和文献提出判断，再通过问卷或数据分析验证这个判断是否成立。",
+          start: [
+            "先找两个核心变量：一个可能产生影响的因素X，一个可能被影响的结果Y。",
+            "再问：X会不会影响Y？为什么可能影响？有没有文献支持？",
+            "最后确认：我能不能用成熟量表测量X和Y，并收集足够问卷？"
+          ],
+          caseTitle: "亲和型领导对员工工作投入的影响研究",
+          caseRead: "这个题目不是写“领导应该亲和”，而是验证亲和型领导水平越高，员工工作投入是否越高，以及这种关系是否有数据支持。",
+          breakdown: [
+            "自变量X：亲和型领导。",
+            "因变量Y：员工工作投入。",
+            "研究任务：提出假设，收集问卷，做信效度、相关、回归等分析。",
+            "进阶变化：如果有中介或调节变量，还要说明变量之间的作用路径。"
+          ],
+          data: [
+            "成熟量表：检索亲和型领导量表、员工工作投入量表，尽量不要完全自编。",
+            "问卷对象：企业员工、实习生、服务行业员工、平台劳动者等。",
+            "样本数量：本科论文基本建议不少于150份有效问卷；做中介、调节尽量200份以上。",
+            "控制变量：性别、年龄、学历、工作年限、岗位类型等。"
+          ],
+          pitfalls: [
+            "没有理论和文献就直接提出假设。",
+            "变量名称看起来高级，但找不到成熟量表或无法测量。",
+            "把相关关系写成因果关系，或过度解释统计结果。"
+          ]
+        },
+        文献综述与理论分析型: {
+          oneLine: "不是逐篇抄摘要，而是把一批文献分类、比较、评价。",
+          plain: "这类论文不研究某家公司，也不一定发问卷，而是系统整理已有研究，回答别人已经研究了什么、怎么研究、得出什么结论、还有什么不足。",
+          start: [
+            "先确定一个主题，例如新生代员工激励、直播电商消费者行为、慢就业。",
+            "再围绕主题找文献，并记录检索关键词、筛选标准和最终纳入文献。",
+            "最后把文献按研究对象、理论、方法、结论和不足进行比较。"
+          ],
+          caseTitle: "新生代员工激励机制研究综述",
+          caseRead: "这个题目不是把10篇文章分别概括一遍，而是整理已有研究从哪些角度讨论新生代员工激励、用了哪些理论、有哪些结论和不足。",
+          breakdown: [
+            "研究对象：新生代员工激励机制这一主题。",
+            "核心任务：分类、比较、评价已有研究。",
+            "主要产出：研究脉络、研究热点、方法比较、研究不足、未来方向。",
+            "关键证据：文献矩阵，而不是零散摘抄。"
+          ],
+          data: [
+            "中文文献：CNKI、万方、维普。",
+            "英文文献：Google Scholar、Web of Science、ScienceDirect等。",
+            "行业资料：人力资源服务报告、青年就业报告、组织管理白皮书。",
+            "文献矩阵：作者、年份、对象、方法、理论、结论、局限。"
+          ],
+          pitfalls: [
+            "写成资料汇编或读后感。",
+            "只堆摘要，不比较研究方法和结论。",
+            "没有说明文献是怎么检索、筛选和分类的。"
+          ]
+        },
+        方案设计与应用型: {
+          oneLine: "先证明需要方案，再设计方案内容，最后说明如何落地和评价。",
+          plain: "这类论文要设计一套可执行方案，比如培训、营销、运营、服务流程或管理制度方案。方案不能凭空想，要先证明为什么需要，再说明怎么做、谁来做、怎么评价效果。",
+          start: [
+            "先找一个明确场景：谁需要这个方案？目前有什么需求或问题？",
+            "再收集需求证据，说明现有做法为什么不够。",
+            "最后设计方案目标、流程、责任主体、实施步骤和评价指标。"
+          ],
+          caseTitle: "A公司新员工导师制培训方案设计",
+          caseRead: "这个题目不是简单写“导师制很好”，而是要证明A公司新员工在岗位适应、技能掌握或团队融入上有需求，再设计适合A公司的导师制培训方案。",
+          breakdown: [
+            "研究对象：A公司新员工培养场景。",
+            "核心任务：设计导师制培训方案。",
+            "方案内容：导师选拔、带教内容、周期安排、监督机制、评价指标。",
+            "落地要求：方案必须和前面发现的需求或问题对应。"
+          ],
+          data: [
+            "访谈数据：访谈新员工、导师候选人、部门主管、人力资源人员。",
+            "问卷数据：调查培训满意度、岗位适应度、导师需求。",
+            "企业资料：培训制度、课程表、岗位说明书、绩效反馈、离职记录。",
+            "标杆案例：其他企业导师制、新员工培养方案、行业培训案例。",
+            "评价指标：岗位胜任速度、满意度、考核结果、留任率等。"
+          ],
+          pitfalls: [
+            "方案凭空设计，没有需求证据。",
+            "只写原则，不写流程、责任人、时间安排和评价方式。",
+            "方案和前文发现的问题没有对应关系。"
+          ]
+        }
+      };
+      return guides[category] || guides.问题诊断与优化型;
+    }
+
+    function renderTypeGuide(category) {
+      const guide = paperTypeGuide(category);
+      return `
+        <div class="grid">
+          <div class="panel span-12">
+            <h3>${escapeHtml(category)}：这类论文到底在做什么</h3>
+            <p class="hint">${escapeHtml(guide.plain)}</p>
+          </div>
+          <div class="panel span-6"><h3>你第一步该做什么</h3><div class="result">${guide.start.map(escapeHtml).join("\n")}</div></div>
+          <div class="panel span-6"><h3>典型案例</h3><div class="result">${escapeHtml(guide.caseTitle)}\n\n${escapeHtml(guide.caseRead)}</div></div>
+          <div class="panel span-6"><h3>案例怎么拆</h3><div class="result">${guide.breakdown.map(escapeHtml).join("\n")}</div></div>
+          <div class="panel span-6"><h3>案例及数据怎么获取</h3><div class="result">${guide.data.map(escapeHtml).join("\n")}</div></div>
+          <div class="panel span-12"><h3>最容易写错的地方</h3><div class="result">${guide.pitfalls.map(escapeHtml).join("\n")}</div></div>
+        </div>`;
+    }
+
+    function renderReferenceTopicPicker(major, category, selectedTitle = "") {
+      const topics = topicBank[major]?.[category] || [];
+      const firstTitle = selectedTitle || topics[0] || "";
+      return `
+        <details class="drawer" open>
+          <summary>选择一个参考题目进行拆解（${escapeHtml(major)} · ${escapeHtml(category)}）</summary>
+          <div class="drawer-body">
+            <div class="row">
+              ${topics.map((title, index) => `<button class="btn ${title === firstTitle || (!firstTitle && index === 0) ? "primary" : ""}" data-reference-topic="${escapeHtml(title)}">${escapeHtml(title)}</button>`).join("")}
+            </div>
+          </div>
+        </details>
+        <div id="referenceTopicDetail" style="margin-top:14px;">${firstTitle ? renderReferenceTopicDetail(major, category, firstTitle) : `<div class="notice warn">该专业该类型下暂无参考题目。</div>`}</div>`;
+    }
+
+    function renderReferenceTopicDetail(major, category, title) {
+      const d = topicDetail(major, category, title);
+      const guide = paperTypeGuide(category);
+      return `
+        <div class="panel">
+          <h3>${escapeHtml(title)}</h3>
+          <p class="hint">${escapeHtml(d.summary)}</p>
+          <div class="notice">类型提醒：${escapeHtml(guide.oneLine)}</div>
+          <div class="detail-grid" style="margin-top:14px;">
+            <div class="detail-box"><strong>研究意义</strong>${escapeHtml(d.significance)}</div>
+            <div class="detail-box"><strong>重点研究问题</strong>${d.questions.map(escapeHtml).join("<br>")}</div>
+            <div class="detail-box"><strong>可收集数据</strong>${d.data.map(escapeHtml).join("<br>")}</div>
+            <div class="detail-box"><strong>分析方法</strong>${d.methods.map(escapeHtml).join("<br>")}</div>
+            <div class="detail-box"><strong>常见坑</strong>${d.pitfalls.map(escapeHtml).join("<br>")}</div>
+            <div class="detail-box"><strong>阶段产出</strong>${d.output.map(escapeHtml).join("<br>")}</div>
+          </div>
+        </div>`;
     }
 
     function renderTopicRow(major, category, title) {
@@ -1416,10 +1659,9 @@
           <div class="field" style="min-width:240px;"><label>论文类型</label><select id="paperType">${paperTypes().map((t) => `<option value="${t}">${t}</option>`).join("")}</select></div>
         </div>
         <div id="paperList"></div>
-        <div id="paperAnalysis" class="panel" style="margin-top:14px;">
-          <h3>论文拆解框</h3>
-          <p class="hint">请选择一篇论文后查看拆解内容。</p>
-          <div id="paperAnalysisContent" class="result">尚未选择论文。</div>
+        <div id="paperAnalysis" class="panel" style="margin-top:6px; padding:8px 10px 10px;">
+          <h3 style="margin-bottom:4px;">论文拆解框</h3>
+          <div id="paperAnalysisContent" class="paper-analysis-content">尚未选择论文。</div>
         </div>
         <div id="paperPreview" class="floating-preview">
           <div class="floating-head" id="paperPreviewHead">
@@ -1436,6 +1678,44 @@
       const render = () => {
         const list = excellentPapers.filter((p) => p.major === major.value && p.type === type.value);
         document.getElementById("paperList").innerHTML = list.length ? renderPaperGroup(major.value, type.value, list) : `<div class="notice warn">该专业和类型下暂无样本论文。</div>`;
+        bindPaperTitleButtons();
+      };
+      major.addEventListener("change", render);
+      type.addEventListener("change", render);
+      render();
+      wireFloatingPreview();
+    }
+
+    function renderPaperGroup(major, type, papers) {
+      const firstPaper = papers[0];
+      return `
+        <details class="drawer paper-group" ${papers.length === 1 ? "open" : ""}>
+          <summary>${escapeHtml(major)} · ${escapeHtml(type)}（${papers.length}篇）</summary>
+          <div class="drawer-body">
+            <div class="paper-title-row">${papers.map(renderPaperTitleButton).join("")}</div>
+            <div id="paperActionPanel">${firstPaper ? renderPaperActionPanel(firstPaper) : ""}</div>
+          </div>
+        </details>`;
+    }
+
+    function renderPaperTitleButton(paper) {
+      return `<button class="btn paper-title-btn" data-select-paper="${paper.id}">${escapeHtml(paper.title)}</button>`;
+    }
+
+    function renderPaperActionPanel(paper) {
+      return `
+        <div class="paper-action-panel">
+          <h3>${escapeHtml(paper.title)}</h3>
+          <div class="row">
+            <button class="btn primary" data-preview-paper="${paper.id}">点击预览</button>
+            <button class="btn" data-open-paper="${paper.id}">直接阅读PDF</button>
+            <button class="btn" data-analyze-paper="${paper.id}">AI 拆解论文</button>
+          </div>
+        </div>`;
+    }
+
+    function bindPaperTitleButtons() {
+      const bindActions = () => {
         document.querySelectorAll("[data-preview-paper]").forEach((btn) => {
           btn.addEventListener("click", () => openPaperPreview(excellentPapers.find((p) => p.id === btn.dataset.previewPaper)));
         });
@@ -1446,32 +1726,17 @@
           btn.addEventListener("click", () => handleAnalyzePaper(excellentPapers.find((p) => p.id === btn.dataset.analyzePaper)));
         });
       };
-      major.addEventListener("change", render);
-      type.addEventListener("change", render);
-      render();
-      wireFloatingPreview();
-    }
-
-    function renderPaperGroup(major, type, papers) {
-      return `
-        <details class="drawer paper-group" ${papers.length === 1 ? "open" : ""}>
-          <summary>${escapeHtml(major)} · ${escapeHtml(type)}（${papers.length}篇）</summary>
-          <div class="drawer-body">${papers.map(renderPaperCard).join("")}</div>
-        </details>`;
-    }
-
-    function renderPaperCard(paper) {
-      return `
-        <div class="paper-card">
-          <h3>${escapeHtml(paper.title)}</h3>
-          <p class="hint">${escapeHtml(paper.major)} · ${escapeHtml(paper.type)} · ${escapeHtml(paper.year)}</p>
-          <div>${paper.tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>
-          <div class="row" style="margin-top:10px;">
-            <button class="btn primary" data-preview-paper="${paper.id}">点击预览</button>
-            <button class="btn" data-open-paper="${paper.id}">直接阅读PDF</button>
-            <button class="btn" data-analyze-paper="${paper.id}">AI 拆解论文</button>
-          </div>
-        </div>`;
+      document.querySelectorAll("[data-select-paper]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const paper = excellentPapers.find((p) => p.id === btn.dataset.selectPaper);
+          document.querySelectorAll("[data-select-paper]").forEach((item) => item.classList.toggle("primary", item === btn));
+          document.getElementById("paperActionPanel").innerHTML = renderPaperActionPanel(paper);
+          bindActions();
+        });
+      });
+      const first = document.querySelector("[data-select-paper]");
+      if (first) first.classList.add("primary");
+      bindActions();
     }
 
     async function openPaperInNewTab(paper) {
@@ -1727,7 +1992,7 @@ JSON字段必须包括：
         <div class="analysis-tabs">
           ${tabs.map(([key, label]) => `<button class="btn ${key === activeKey ? "primary" : ""}" data-paper-tab="${key}" data-paper-id="${paper.id}">${label}</button>`).join("")}
         </div>
-        <div class="result analysis-panel">${escapeHtml(content)}</div>`;
+        <div class="paper-analysis-text analysis-panel">${escapeHtml(content)}</div>`;
       document.querySelectorAll("[data-paper-tab]").forEach((btn) => {
         btn.addEventListener("click", () => showPaperAnalysis(excellentPapers.find((p) => p.id === btn.dataset.paperId), btn.dataset.paperTab));
       });
