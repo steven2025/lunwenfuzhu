@@ -4,6 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>本科论文全过程AI辅助系统</title>
+  <meta name="theme-color" content="#10172a" />
+  <meta name="application-name" content="本科论文AI辅助系统" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="论文AI辅助" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <style>
     :root {
       --bg: #eef2f7;
@@ -77,7 +86,21 @@
       background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
       border-top: 4px solid var(--brand);
     }
+    .login-logo-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .app-icon {
+      width: 54px;
+      height: 54px;
+      border-radius: 14px;
+      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.16);
+      flex: 0 0 auto;
+    }
     .intro h1 { margin: 0 0 12px; font-size: 30px; line-height: 1.25; }
+    .login-logo-title h1 { margin: 0; }
     .intro p { color: var(--muted); line-height: 1.8; margin: 0 0 18px; }
     .developer { margin-top: 24px; color: #0f172a; font-weight: 700; }
 
@@ -111,7 +134,23 @@
       margin-bottom: 12px;
     }
 
+    .brand-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .brand-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+      flex: 0 0 auto;
+    }
+
     .brand h1 { margin: 0 0 8px; font-size: 16px; line-height: 1.35; }
+    .brand-top h1 { margin: 0; }
     .brand p { margin: 0; color: #aebbd0; font-size: 13px; line-height: 1.6; }
 
     .nav-title {
@@ -808,6 +847,56 @@
       box-shadow: 0 10px 24px rgba(245, 158, 11, 0.12);
     }
 
+    .install-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      place-items: center;
+      padding: 18px;
+      background: rgba(15, 23, 42, 0.46);
+      z-index: 90;
+      backdrop-filter: blur(6px);
+    }
+
+    .install-overlay.show { display: grid; }
+
+    .install-card {
+      width: min(520px, 100%);
+      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-strong);
+      padding: 22px;
+      border-top: 4px solid var(--brand);
+    }
+
+    .install-head {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .install-head img {
+      width: 62px;
+      height: 62px;
+      border-radius: 16px;
+      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.16);
+    }
+
+    .install-head h3 { margin: 0; font-size: 20px; }
+    .install-card p { margin: 0 0 12px; color: var(--muted); line-height: 1.7; }
+    .install-tips {
+      border: 1px dashed #b7c2d6;
+      border-radius: var(--radius);
+      padding: 11px;
+      background: #fbfcfe;
+      color: #334155;
+      line-height: 1.7;
+      font-size: 14px;
+      margin-bottom: 14px;
+    }
+
     .notice-track {
       display: inline-block;
       white-space: nowrap;
@@ -853,7 +942,10 @@
   <section id="loginShell" class="login-shell">
     <div class="login-card">
       <div class="intro">
-        <h1>本科论文全过程AI辅助系统</h1>
+        <div class="login-logo-title">
+          <img class="app-icon" src="icons/icon-192.png" alt="本科论文AI辅助系统图标">
+          <h1>本科论文全过程AI辅助系统</h1>
+        </div>
         <p>系统定位为面向学生的论文全过程训练工具。AI 负责解释步骤、提出追问、帮助检查证据链，让学生在选题、文献、提纲、方法、数据和分析中形成可解释的阶段产出。</p>
         <div class="cards">
           <div class="mini-card"><strong>学生端</strong><p>选题、文献、提纲、研究方法、数据获取、数据分析六个助手。</p></div>
@@ -892,7 +984,10 @@
   <div id="appShell" class="app hidden">
     <aside class="sidebar">
       <div class="brand">
-        <h1>本科论文全过程AI辅助系统</h1>
+        <div class="brand-top">
+          <img class="brand-icon" src="icons/icon-64.png" alt="">
+          <h1>本科论文全过程AI辅助系统</h1>
+        </div>
         <p id="roleLabel">学生端</p>
       </div>
       <div class="nav-title">系统</div>
@@ -968,9 +1063,27 @@
     </main>
   </div>
 
+  <div id="installOverlay" class="install-overlay" aria-hidden="true">
+    <div class="install-card">
+      <div class="install-head">
+        <img src="icons/icon-192.png" alt="">
+        <div>
+          <h3>安装到桌面</h3>
+          <p>建议把系统安装到电脑、平板或手机桌面，后续可像普通应用一样打开。</p>
+        </div>
+      </div>
+      <div class="install-tips" id="installTips">点击“立即安装”。如果浏览器暂未显示安装窗口，请使用浏览器菜单中的“安装应用”或“添加到主屏幕”。</div>
+      <div class="row">
+        <button class="btn primary" id="installAppBtn" type="button">立即安装</button>
+        <button class="btn" id="installLaterBtn" type="button">稍后再说</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const CLOUD_FUNCTION_URL = "https://1311686407-cg9lh2w33z.ap-guangzhou.tencentscf.com";
     const PDF_SIGN_CACHE_VERSION = "pdfjs-v1";
+    let deferredInstallPrompt = null;
 
     const providerConfig = {
       deepseek: { baseUrl: "https://api.deepseek.com/v1/chat/completions", model: "deepseek-chat" },
@@ -1182,6 +1295,56 @@
       }).join("");
     }
 
+    function isAppInstalledMode() {
+      return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true || localStorage.getItem("thesisPwaInstalled") === "true";
+    }
+
+    function updateInstallTips() {
+      const tips = document.getElementById("installTips");
+      if (!tips) return;
+      const ua = navigator.userAgent || "";
+      if (/iphone|ipad|ipod/i.test(ua)) {
+        tips.textContent = "iPhone/iPad：请点击浏览器底部或顶部的分享按钮，然后选择“添加到主屏幕”。";
+      } else if (/android/i.test(ua)) {
+        tips.textContent = "安卓手机：请点击“立即安装”；如果没有弹出安装窗口，请打开浏览器菜单，选择“安装应用”或“添加到主屏幕”。";
+      } else {
+        tips.textContent = "电脑端：请点击“立即安装”；如果没有弹出安装窗口，请在浏览器地址栏右侧或菜单中选择“安装应用”。";
+      }
+    }
+
+    function showInstallReminder() {
+      if (isAppInstalledMode()) return;
+      const overlay = document.getElementById("installOverlay");
+      if (!overlay) return;
+      updateInstallTips();
+      overlay.classList.add("show");
+      overlay.setAttribute("aria-hidden", "false");
+    }
+
+    function hideInstallReminder() {
+      const overlay = document.getElementById("installOverlay");
+      if (!overlay) return;
+      overlay.classList.remove("show");
+      overlay.setAttribute("aria-hidden", "true");
+    }
+
+    async function registerPwaSupport() {
+      if ("serviceWorker" in navigator && location.protocol !== "file:") {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+      }
+    }
+
+    window.addEventListener("beforeinstallprompt", (event) => {
+      event.preventDefault();
+      deferredInstallPrompt = event;
+    });
+
+    window.addEventListener("appinstalled", () => {
+      localStorage.setItem("thesisPwaInstalled", "true");
+      deferredInstallPrompt = null;
+      hideInstallReminder();
+    });
+
     function showApp(role, name) {
       document.getElementById("loginShell").classList.add("hidden");
       document.getElementById("appShell").classList.remove("hidden");
@@ -1199,6 +1362,7 @@
       if (role === "teacher") activateModule("teacherOverview");
       else if (role === "admin") activateModule("adminSettings");
       else activateModule("home");
+      setTimeout(showInstallReminder, 600);
     }
 
     if (user?.verified) {
@@ -1248,6 +1412,27 @@
       document.getElementById("loginResult").className = "notice";
       document.getElementById("loginResult").textContent = "已退出系统，请重新登录。";
     });
+
+    document.getElementById("installLaterBtn").addEventListener("click", () => {
+      hideInstallReminder();
+    });
+
+    document.getElementById("installAppBtn").addEventListener("click", async () => {
+      updateInstallTips();
+      if (!deferredInstallPrompt) {
+        document.getElementById("installTips").textContent += " 当前浏览器暂未开放一键安装，请按上面的手动方式添加。";
+        return;
+      }
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice;
+      if (choice.outcome === "accepted") {
+        localStorage.setItem("thesisPwaInstalled", "true");
+        hideInstallReminder();
+      }
+      deferredInstallPrompt = null;
+    });
+
+    registerPwaSupport();
 
     async function verifyPin(role, name, pin) {
       const response = await fetch(CLOUD_FUNCTION_URL, {
