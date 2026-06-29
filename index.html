@@ -897,6 +897,213 @@
       margin-bottom: 14px;
     }
 
+    .api-tutorial {
+      display: grid;
+      gap: 12px;
+    }
+
+    .api-screen {
+      position: relative;
+      min-height: 360px;
+      border: 1px solid #c8d4e8;
+      border-radius: var(--radius);
+      overflow: hidden;
+      background:
+        linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(15, 118, 110, 0.08)),
+        #f8fbff;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.86), 0 16px 38px rgba(15, 23, 42, 0.08);
+    }
+
+    .browser-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: linear-gradient(180deg, #ffffff, #edf4ff);
+      border-bottom: 1px solid #d9e2f2;
+    }
+
+    .browser-dot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; }
+    .browser-dot:nth-child(2) { background: #f59e0b; }
+    .browser-dot:nth-child(3) { background: #10b981; }
+
+    .browser-url {
+      flex: 1;
+      background: #fff;
+      border: 1px solid #d4ddeb;
+      border-radius: 999px;
+      padding: 8px 13px;
+      color: #0f172a;
+      font-weight: 650;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
+    }
+
+    .api-stage {
+      display: none;
+      grid-template-columns: minmax(0, 1.1fr) minmax(220px, .9fr);
+      gap: 14px;
+      padding: 18px;
+      align-items: stretch;
+      min-height: 308px;
+    }
+
+    .api-stage.active { display: grid; animation: stageIn .38s ease both; }
+
+    @keyframes stageIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .mock-page, .step-card {
+      border: 1px solid #d9e2f2;
+      border-radius: var(--radius);
+      background: rgba(255,255,255,0.88);
+      padding: 14px;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    .mock-brand {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 14px;
+      font-weight: 800;
+      color: #102044;
+    }
+
+    .mock-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .mock-logo::before {
+      content: "";
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #2563eb, #0f766e);
+      box-shadow: 0 8px 18px rgba(37, 99, 235, 0.24);
+    }
+
+    .mock-nav {
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .mock-hero {
+      min-height: 116px;
+      border-radius: var(--radius);
+      padding: 16px;
+      background: linear-gradient(135deg, #0f172a, #1d4ed8 58%, #0f766e);
+      color: #fff;
+      display: grid;
+      align-content: center;
+      gap: 6px;
+    }
+
+    .mock-hero strong { font-size: 21px; }
+    .mock-hero span { color: #dbeafe; line-height: 1.55; }
+
+    .mock-row { display: grid; gap: 8px; margin-top: 12px; }
+    .mock-line {
+      height: 14px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #dbeafe, #ecfeff);
+    }
+    .mock-line.short { width: 62%; }
+
+    .mock-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      padding: 8px 12px;
+      border-radius: var(--radius);
+      background: linear-gradient(135deg, #2563eb, #0e7490);
+      color: #fff;
+      font-weight: 750;
+      width: fit-content;
+      box-shadow: 0 12px 24px rgba(37, 99, 235, 0.22);
+    }
+
+    .mock-table {
+      display: grid;
+      gap: 7px;
+      margin-top: 12px;
+    }
+
+    .mock-table div {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      padding: 9px;
+      border: 1px solid #e2e8f0;
+      border-radius: var(--radius);
+      background: #fff;
+      color: #334155;
+    }
+
+    .key-box {
+      margin-top: 12px;
+      border: 1px dashed #f59e0b;
+      background: #fff7ed;
+      color: #92400e;
+      border-radius: var(--radius);
+      padding: 10px;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+
+    .step-card h4 { margin: 0 0 8px; font-size: 18px; }
+    .step-card p { color: var(--muted); line-height: 1.7; margin: 0 0 10px; }
+    .step-card .warning {
+      border-left: 4px solid #f59e0b;
+      background: #fff7ed;
+      color: #92400e;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: 9px 10px;
+      line-height: 1.65;
+      font-size: 14px;
+    }
+
+    .api-steps {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    .api-step-btn {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      color: #334155;
+      min-height: 34px;
+      font-size: 12px;
+      font-weight: 750;
+      padding: 6px;
+      text-align: center;
+    }
+
+    .api-step-btn.active {
+      color: #fff;
+      border-color: transparent;
+      background: linear-gradient(135deg, #2563eb, #0e7490);
+      box-shadow: 0 10px 20px rgba(37, 99, 235, 0.2);
+    }
+
+    .api-note {
+      border-left: 4px solid var(--brand);
+      background: var(--soft);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: 10px;
+      color: #26415f;
+      line-height: 1.65;
+      font-size: 14px;
+    }
+
     .notice-track {
       display: inline-block;
       white-space: nowrap;
@@ -924,6 +1131,8 @@
       .subnav-shell { grid-template-columns: 1fr; }
       .subnav { position: static; }
       .literature-split { grid-template-columns: 1fr; }
+      .api-stage.active { grid-template-columns: 1fr; }
+      .api-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .detail-grid { grid-template-columns: 1fr; }
     }
 
@@ -1577,11 +1786,111 @@
             <div id="modelResult" class="notice" style="margin-top:14px;">尚未测试模型连接。</div>
           </div>
           <div class="panel span-6">
-            <h3>说明</h3>
-            <div class="notice warn">如果模型测试不成功，请检查接口地址、模型名称和 API Key 是否正确，或更换可用的模型服务。</div>
+            <h3>DeepSeek API Key 获取动画教程</h3>
+            <div class="api-tutorial">
+              <div class="api-screen" id="deepseekTutorial">
+                <div class="browser-bar">
+                  <span class="browser-dot"></span><span class="browser-dot"></span><span class="browser-dot"></span>
+                  <div class="browser-url" id="tutorialUrl">https://www.deepseek.com</div>
+                </div>
+                ${deepseekTutorialStagesHtml()}
+              </div>
+              <div class="api-steps">
+                ${["输入网址", "进入平台", "登录账户", "充值", "创建Key", "复制保存"].map((label, index) => `<button class="api-step-btn ${index === 0 ? "active" : ""}" data-api-step="${index}">${label}</button>`).join("")}
+              </div>
+              <div class="api-note">特别提醒：API Key 通常只在创建成功时完整显示一次。复制后请立即保存到自己的安全位置，不要发给别人，也不要截图公开。</div>
+              <div class="notice warn">如果模型测试不成功，请检查接口地址、模型名称和 API Key 是否正确，或更换可用的模型服务。</div>
+            </div>
           </div>
         </div>`;
       wireModelPanel();
+      wireDeepseekTutorial();
+    }
+
+    function deepseekTutorialStagesHtml() {
+      const stages = [
+        {
+          url: "https://www.deepseek.com",
+          mock: `<div class="mock-brand"><span class="mock-logo">DeepSeek</span><span class="mock-nav">首页 · API · 开放平台</span></div><div class="mock-hero"><strong>在浏览器输入 deepseek.com</strong><span>进入 DeepSeek 官网，寻找 API / Platform / 开放平台入口。</span></div><div class="mock-row"><div class="mock-line"></div><div class="mock-line short"></div></div>`,
+          title: "第一步：输入网址",
+          text: "打开浏览器，在地址栏输入 deepseek.com，进入 DeepSeek 官网。不要从不明链接进入，避免误入仿冒页面。",
+          warn: "如果页面样式与教程不同，以官网实际页面为准，关键是找到 API 或开放平台入口。"
+        },
+        {
+          url: "https://platform.deepseek.com",
+          mock: `<div class="mock-brand"><span class="mock-logo">DeepSeek Platform</span><span class="mock-nav">Docs · API Keys · Billing</span></div><div class="mock-table"><div><span>API 文档</span><strong>查看</strong></div><div><span>API Keys</span><strong>进入</strong></div><div><span>充值 / Billing</span><strong>进入</strong></div></div><div class="mock-button" style="margin-top:12px;">进入开放平台</div>`,
+          title: "第二步：进入开放平台",
+          text: "在官网中进入开放平台。也可以直接访问 platform.deepseek.com。进入后通常会看到 API 文档、API Keys、充值或 Billing 等入口。",
+          warn: "如果没有看到相关菜单，请先完成登录。"
+        },
+        {
+          url: "https://platform.deepseek.com/sign_in",
+          mock: `<div class="mock-brand"><span class="mock-logo">登录 DeepSeek</span><span class="mock-nav">邮箱 / 手机</span></div><div class="mock-row"><div class="mock-line"></div><div class="mock-line"></div><div class="mock-button">登录 / 注册</div></div><div class="mock-table"><div><span>账号验证</span><strong>完成</strong></div><div><span>进入控制台</span><strong>继续</strong></div></div>`,
+          title: "第三步：登录或注册",
+          text: "使用自己的邮箱或手机号登录。如果还没有账号，先注册并完成必要验证。登录后进入控制台。",
+          warn: "请使用自己的账号，不要多人共用同一个 API Key。"
+        },
+        {
+          url: "https://platform.deepseek.com/usage",
+          mock: `<div class="mock-brand"><span class="mock-logo">Billing / 充值</span><span class="mock-nav">余额 · 用量 · 支付</span></div><div class="mock-hero"><strong>充值后才能稳定调用 API</strong><span>查看余额，选择合适金额充值，保留支付记录。</span></div><div class="mock-table"><div><span>当前余额</span><strong>¥ --</strong></div><div><span>充值金额</span><strong>选择</strong></div></div>`,
+          title: "第四步：充值或检查余额",
+          text: "进入充值、Billing 或 Usage 页面，检查账户余额。余额不足时，按页面提示充值。不同时间平台规则可能变化，以实际页面为准。",
+          warn: "建议先小额充值测试，确认本系统能正常接通后再继续使用。"
+        },
+        {
+          url: "https://platform.deepseek.com/api_keys",
+          mock: `<div class="mock-brand"><span class="mock-logo">API Keys</span><span class="mock-nav">Create new key</span></div><div class="mock-table"><div><span>Key 名称</span><strong>论文辅助系统</strong></div><div><span>权限</span><strong>默认</strong></div></div><div class="mock-button" style="margin-top:12px;">Create API Key</div><div class="key-box">sk-••••••••••••••••••••••••</div>`,
+          title: "第五步：创建 API Key",
+          text: "进入 API Keys 页面，点击 Create API Key 或创建密钥。可以给 Key 起一个容易识别的名称，例如“论文辅助系统”。",
+          warn: "创建后页面会显示一串以 sk- 开头的密钥，这就是要粘贴到本系统的 API Key。"
+        },
+        {
+          url: "https://platform.deepseek.com/api_keys",
+          mock: `<div class="mock-brand"><span class="mock-logo">复制并保存</span><span class="mock-nav">Only shown once</span></div><div class="key-box">sk-1234••••••••••••••••••••••••abcd</div><div class="mock-row"><div class="mock-button">复制 API Key</div><div class="mock-line"></div><div class="mock-line short"></div></div>`,
+          title: "第六步：立即复制并妥善保存",
+          text: "创建成功后，马上点击复制，并保存到自己的安全位置。之后回到本系统，把 Key 粘贴到 API Key 输入框，再点击测试是否接通。",
+          warn: "非常重要：API Key 只有第一次创建时能完整看到和复制。关闭页面后，通常无法再次查看完整 Key，只能删除后重新创建。"
+        }
+      ];
+      return stages.map((stage, index) => `
+        <div class="api-stage ${index === 0 ? "active" : ""}" data-api-stage="${index}" data-url="${escapeHtml(stage.url)}">
+          <div class="mock-page">${stage.mock}</div>
+          <div class="step-card">
+            <h4>${stage.title}</h4>
+            <p>${stage.text}</p>
+            <div class="warning">${stage.warn}</div>
+          </div>
+        </div>`).join("");
+    }
+
+    function wireDeepseekTutorial() {
+      const stages = Array.from(document.querySelectorAll("[data-api-stage]"));
+      const buttons = Array.from(document.querySelectorAll("[data-api-step]"));
+      const url = document.getElementById("tutorialUrl");
+      if (!stages.length || !buttons.length || !url) return;
+      let active = 0;
+      let timer = null;
+      const show = (index) => {
+        active = index;
+        stages.forEach((stage, i) => stage.classList.toggle("active", i === active));
+        buttons.forEach((btn, i) => btn.classList.toggle("active", i === active));
+        url.textContent = stages[active].dataset.url || "https://www.deepseek.com";
+      };
+      const play = () => {
+        clearInterval(timer);
+        timer = setInterval(() => show((active + 1) % stages.length), 3600);
+      };
+      buttons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          show(Number(btn.dataset.apiStep));
+          play();
+        });
+      });
+      const tutorial = document.getElementById("deepseekTutorial");
+      tutorial?.addEventListener("mouseenter", () => clearInterval(timer));
+      tutorial?.addEventListener("mouseleave", play);
+      show(0);
+      play();
     }
 
     function wireModelPanel() {
@@ -2834,8 +3143,8 @@ JSON字段必须包括：
           <div class="panel span-12">
             <div class="field"><label>你初步拟定的题目</label><textarea id="topicDraft" placeholder="请手动输入题目，例如：某公司新员工培训体系优化研究"></textarea></div>
             <div class="level-tabs">
-              <button class="btn primary" id="topicCoachBasicBtn">题目诊断及建议（80分左右）</button>
-              <button class="btn" id="topicCoachImproveBtn">论文质量提升途径（90分左右）</button>
+              <button class="btn primary" id="topicCoachBasicBtn">基本诊断（80分以下）</button>
+              <button class="btn" id="topicCoachImproveBtn">论文质量提升途径（90分以上）</button>
             </div>
           </div>
           <div class="panel span-12">
