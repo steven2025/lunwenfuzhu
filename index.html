@@ -1337,7 +1337,7 @@
       renderHome();
       renderModel();
       renderLiteratureAssistant();
-      renderStudentAssistant("outline", outlineSubmodules());
+      renderOutlineAssistant();
       renderStudentAssistant("method", methodSubmodules());
       renderStudentAssistant("collection", collectionSubmodules());
       renderStudentAssistant("analysis", analysisSubmodules());
@@ -1520,6 +1520,8 @@
       if (moduleId === "literature" && subId === "import") wireLiteratureImport();
       if (moduleId === "literature" && subId === "match") wireLiteratureMatch();
       if (moduleId === "literature" && subId === "review") wireLiteratureReview();
+      if (moduleId === "outline" && subId === "topic") wireOutlineTopic();
+      if (moduleId === "outline" && subId === "generate") wireOutlineGenerate();
     }
 
     function topicLearnHtml() {
@@ -2695,6 +2697,8 @@ JSON字段必须包括：
     }
 
     function topicDiagnosisHistory() {
+      const scoped = getUserStorage("topicDiagnosisHistory", "");
+      if (scoped) return JSON.parse(scoped || "[]");
       return JSON.parse(localStorage.getItem("topicDiagnosisHistory") || "[]");
     }
 
@@ -2708,6 +2712,7 @@ JSON字段必须包括：
       } else {
         history.unshift({ id: Date.now().toString(), title, [level]: content, createdAt: now, updatedAt: now });
       }
+      setUserStorage("topicDiagnosisHistory", JSON.stringify(history.slice(0, 50)));
       localStorage.setItem("topicDiagnosisHistory", JSON.stringify(history.slice(0, 50)));
       syncCloud("saveTopicDiagnosis", { title, level, content });
       renderTopicDiagnosisHistory();
@@ -3569,6 +3574,136 @@ ${docs.map((doc, index) => `文献${index + 1}
         { id: "search", label: "检索关键词", what: "把题目拆成概念、对象、场景和方法关键词。", why: "关键词决定能否找到高相关文献。", how: "中文关键词、英文关键词、同义词组合检索。", pitfalls: "只用一个词检索；文献过旧；来源不可靠。", output: "关键词组合和检索记录。" },
         { id: "matrix", label: "文献矩阵", what: "用表格比较文献。", why: "帮助学生从单篇阅读进入整体综述。", how: "记录作者、对象、方法、数据、结论、局限。", pitfalls: "表格只有摘要，没有评价。", output: "文献矩阵表。" }
       ];
+    }
+
+    function renderOutlineAssistant() {
+      document.getElementById("outline").innerHTML = shellWithSubnav("outline", "提纲助手", [
+        ["topic", "选择题目"],
+        ["generate", "生成参考提纲"]
+      ]);
+      setSubContent("outline", "topic", outlineTopicHtml());
+      bindSubnav("outline", {
+        topic: () => outlineTopicHtml(),
+        generate: () => outlineGenerateHtml()
+      });
+    }
+
+    function selectedOutlineTopic() {
+      return getUserStorage("selectedOutlineTopic", "") || "";
+    }
+
+    function selectedOutlineDiagnosis() {
+      const title = selectedOutlineTopic();
+      return topicDiagnosisHistory().find((item) => item.title === title) || null;
+    }
+
+    function outlineTopicHtml() {
+      const history = topicDiagnosisHistory();
+      const selected = selectedOutlineTopic();
+      return `
+        <h3>选择题目</h3>
+        <p class="hint">这次选的是你准备写的论文题目。后面的参考提纲会围绕这个题目生成。</p>
+        <details class="drawer" open>
+          <summary>从历史题目诊断中选择</summary>
+          <div class="drawer-body">
+            <div class="row">${history.map((item) => `<button class="btn" data-outline-topic="${escapeHtml(item.title)}">${escapeHtml(item.title)}</button>`).join("") || `<span class="hint">暂无历史题目，请先到“选题助手-形成候选题目”生成题目诊断。</span>`}</div>
+          </div>
+        </details>
+        <div id="outlineTopicCurrent" class="notice" style="margin-top:14px;">${selected ? `你准备撰写的论文题目是：${escapeHtml(selected)}` : "尚未选择准备撰写的论文题目。"}</div>`;
+    }
+
+    function wireOutlineTopic() {
+      document.querySelectorAll("[data-outline-topic]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const title = btn.dataset.outlineTopic;
+          setUserStorage("selectedOutlineTopic", title);
+          saveProject({ topic: title, stage: "准备提纲", progress: Math.max(project.progress || 0, 35) });
+          document.getElementById("outlineTopicCurrent").textContent = `你准备撰写的论文题目是：${title}`;
+        });
+      });
+    }
+
+    function outlineGenerateHtml() {
+      const topic = selectedOutlineTopic();
+      const active = getUserStorage("outlineLevel", "basic") || "basic";
+      const output = getUserStorage(outlineDraftKey(active), "等待生成。") || "等待生成。";
+      return `
+        <h3>生成参考提纲</h3>
+        <div class="notice">${topic ? `当前题目：${escapeHtml(topic)}` : "请先在“选择题目”中选择准备写作的论文题目。"}</div>
+        <div class="level-tabs">
+          <button class="btn ${active === "basic" ? "primary" : ""}" data-outline-level="basic">80分左右的论文</button>
+          <button class="btn ${active === "excellent" ? "primary" : ""}" data-outline-level="excellent">90分左右的论文</button>
+        </div>
+        <div class="row" style="margin:12px 0;"><button class="btn primary" id="generateOutlineBtn">生成参考提纲</button></div>
+        <textarea id="outlineDraftOutput" class="coach-output" readonly>${escapeHtml(output)}</textarea>`;
+    }
+
+    function wireOutlineGenerate() {
+      document.querySelectorAll("[data-outline-level]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          setUserStorage("outlineLevel", btn.dataset.outlineLevel);
+          setSubContent("outline", "generate", outlineGenerateHtml());
+        });
+      });
+      document.getElementById("generateOutlineBtn").addEventListener("click", async () => {
+        const topic = selectedOutlineTopic();
+        const level = getUserStorage("outlineLevel", "basic") || "basic";
+        const box = document.getElementById("outlineDraftOutput");
+        if (!topic) {
+          box.value = "请先在“选择题目”中选择准备写作的论文题目。";
+          return;
+        }
+        const diagnosis = selectedOutlineDiagnosis();
+        if (!diagnosis) {
+          box.value = "未找到该题目的历史诊断，请先到“选题助手-形成候选题目”生成题目诊断。";
+          return;
+        }
+        box.value = level === "excellent" ? "正在生成90分左右论文参考提纲..." : "正在生成80分左右论文参考提纲...";
+        try {
+          const content = await callModel(outlinePrompt(topic, diagnosis, level), "你是本科毕业论文提纲指导教师。请用中文输出结构清晰、符合本科论文规范的提纲。");
+          box.value = content;
+          setUserStorage(outlineDraftKey(level), content);
+          saveProject({ topic, outline: content, stage: "提纲已生成", progress: Math.max(project.progress || 0, 45) });
+        } catch (error) {
+          box.value = "生成失败：" + error.message;
+        }
+      });
+    }
+
+    function outlineDraftKey(level) {
+      return `outlineDraft_${level}_${simpleHash(selectedOutlineTopic() || "none")}`;
+    }
+
+    function outlinePrompt(topic, diagnosis, level) {
+      const isExcellent = level === "excellent";
+      return `请根据学生的题目诊断内容，生成本科毕业论文参考提纲。
+题目：${topic}
+目标：${isExcellent ? "90分左右的论文" : "80分左右的论文"}
+
+基本诊断内容：
+${diagnosis.basic || "未提供"}
+
+论文质量提升途径：
+${diagnosis.improve || "未提供"}
+
+请严格按以下格式输出：
+题目：${topic}
+
+一、一级标题
+（一）二级标题
+（二）二级标题
+
+二、一级标题
+（一）二级标题
+（二）二级标题
+
+格式要求：
+1. 一级标题必须使用中文数字编号：一、二、三、四……
+2. 二级标题必须使用带括号的中文数字编号：（一）（二）（三）……
+3. 不要使用阿拉伯数字编号，不要使用Markdown表格。
+4. 提纲要符合本科论文写作逻辑，章节数量适中。
+5. ${isExcellent ? "90分左右论文的提纲必须参考基本诊断，并体现论文质量提升途径中的研究对象优化、数据来源拓展、分析方法提升、证据链增强等内容。" : "80分左右论文的提纲主要参考基本诊断，强调题目可控、文献够用、方法可执行、数据能支撑基本结论。"}
+6. 最后必须写：以上提纲仅供参考，需要结合你的指导教师意见及能收集到的资料进行修改。祝你写出高质量的论文。`;
     }
 
     function outlineSubmodules() {
