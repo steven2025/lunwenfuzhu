@@ -501,7 +501,7 @@
     }
     .web-search-bar {
       display: grid;
-      grid-template-columns: minmax(170px, .8fr) minmax(280px, 1.6fr) repeat(2, minmax(145px, .7fr)) 100px;
+      grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
       gap: 9px;
       align-items: end;
       padding: 11px;
@@ -527,6 +527,20 @@
     .web-result p { margin: 7px 0; color: #475569; line-height: 1.62; font-size: 13px; }
     .web-result-reason { color: #315071; font-size: 12px; }
     .web-result-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 8px; }
+    .platform-search-actions { display: flex; gap: 7px; flex-wrap: wrap; margin: 9px 0; }
+    .low-match-drawer { margin-top: 8px; border-left: 3px solid var(--warn); }
+    .write-paper-tabs { display: flex; gap: 7px; flex-wrap: wrap; margin: 9px 0 12px; }
+    .write-paper-tabs .btn.active { color: #fff; border-color: transparent; background: linear-gradient(135deg, var(--brand), var(--teal)); }
+    .material-paper-table { min-width: 780px; table-layout: fixed; }
+    .material-paper-table th:nth-child(1) { width: 64px; }
+    .material-paper-table th:nth-child(2) { width: 34%; }
+    .material-paper-table th:nth-child(3) { width: 120px; }
+    .material-paper-table th:nth-child(4) { width: 130px; }
+    .material-paper-table td { padding: 7px 8px; line-height: 1.35; }
+    .material-paper-table a { overflow-wrap: anywhere; }
+    .visualization-panel { border: 1px solid var(--line); border-radius: var(--radius); background: #fff; padding: 10px; overflow: auto; }
+    #publicTextVisualCanvas { width: 100%; min-width: 720px; height: auto; aspect-ratio: 12 / 7; display: block; background: #fff; }
+    .corpus-stale { border-left-color: #dc2626 !important; background: #fff1f2 !important; color: #881337 !important; }
     .manual-import-drawer { margin-top: 12px; }
     .compact-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .compact-form-grid .field { margin: 0; }
@@ -5954,7 +5968,7 @@ ${limitMethodContext(recent, 5000)}
 
     function publicTopicStudyHtml() {
       const workspace = collectionWorkspace();
-      const steps = [["intro", "方法介绍"], ["plan", "研究方案"], ["collect", "话题收集"], ["code", "AI整理编码"], ["ethics", "结果与伦理"]];
+      const steps = [["intro", "方法介绍"], ["plan", "研究方案"], ["collect", "话题收集"], ["code", "AI整理编码"], ["ethics", "结果与伦理"], ["write", "写入论文"]];
       const active = steps.some(([id]) => id === workspace.publicStep) ? workspace.publicStep : "intro";
       return `
         <h3>网络公开话题研究</h3>
@@ -5978,6 +5992,7 @@ ${limitMethodContext(recent, 5000)}
         <div class="panel" style="margin-top:12px;"><h3>网络话题研究方案</h3><textarea id="publicPlanOutput" class="coach-output" readonly>${escapeHtml(workspace.publicPlan || "AI将生成平台、时间、关键词矩阵、纳入标准、字段和初步编码框架。")}</textarea><button class="btn primary" id="generatePublicPlanBtn" type="button" ${context.topic ? "" : "disabled"}>AI生成研究方案</button></div>`;
       if (step === "collect") return publicCollectHtml();
       if (step === "code") return publicCodeHtml();
+      if (step === "write") return publicWriteHtml();
       return publicEthicsHtml();
     }
 
@@ -5996,25 +6011,30 @@ ${limitMethodContext(recent, 5000)}
       const results = workspace.publicSearchResults || [];
       const topic = collectionResearchContext().topic;
       const searchType = publicSearchTypeMeta[workspace.publicSearchType] ? workspace.publicSearchType : "news";
+      const matchMode = workspace.publicSearchMatchMode === "expand" ? "expand" : "strict";
       const endDate = workspace.publicSearchEnd || new Date().toISOString().slice(0, 10);
       const startDate = workspace.publicSearchStart || new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
       return `
-        <div class="notice">AI先根据题目优化检索词，腾讯云联网搜索返回公开结果，再由AI结合论文主题二次排序。搜索结果需要学生确认后才会进入研究资料。</div>
+        <div class="notice">搜索结果不会自动进入分析。请对有价值的结果点击“导入摘要”或“提取正文”，然后进入“AI整理编码”，先完成“已复核纳入”，再点击“AI整理与编码”。每人每天最多实际联网搜索20次，每次最多返回20条；社交平台多组检索可能一次操作消耗2—3次额度，命中缓存不计次数。</div>
         <div class="web-search-bar" style="margin-top:10px;">
           <div class="field"><label>搜索来源</label><select id="publicSearchType">${Object.entries(publicSearchTypeMeta).map(([id, meta]) => `<option value="${id}" ${id === searchType ? "selected" : ""}>${meta.label}</option>`).join("")}</select></div>
+          <div class="field"><label>匹配模式</label><select id="publicSearchMatchMode"><option value="strict" ${matchMode === "strict" ? "selected" : ""}>严格匹配</option><option value="expand" ${matchMode === "expand" ? "selected" : ""}>扩展发现</option></select></div>
           <div class="field"><label>补充检索要求</label><input id="publicSearchExtra" type="text" value="${escapeHtml(workspace.publicSearchExtra || "")}" placeholder="可填写地区、群体、行为或需要排除的内容"></div>
           <div class="field"><label>开始日期</label><input id="publicSearchStart" type="date" value="${startDate}"></div>
           <div class="field"><label>结束日期</label><input id="publicSearchEnd" type="date" value="${endDate}"></div>
           <div class="field"><label>结果数</label><select id="publicSearchCount"><option value="10" ${Number(workspace.publicSearchCount) !== 20 ? "selected" : ""}>10条</option><option value="20" ${Number(workspace.publicSearchCount) === 20 ? "selected" : ""}>20条</option></select></div>
           <button class="btn primary" id="runPublicSearchBtn" type="button" ${topic ? "" : "disabled"}>AI开始搜索</button>
         </div>
-        <div id="publicSearchStatus" class="notice ${results.length ? "ok" : ""}" style="margin-top:10px;">${results.length ? `已获得${results.length}条结果。实际检索词：${escapeHtml(workspace.publicSearchQuery || "")}${workspace.publicSearchCached ? "（命中缓存，未产生重复搜索）" : ""}` : topic ? `当前题目：${escapeHtml(topic)}` : "请先确认研究题目。"}</div>
-        <div class="web-search-results">${publicSearchResultsHtml(results)}</div>
-        <details class="drawer manual-import-drawer"><summary>搜索未覆盖时：手动导入文字、链接或截图</summary><div class="drawer-body">
+        <div id="publicSearchStatus" class="notice ${results.length ? "ok" : ""}" style="margin-top:10px;">${results.length ? `已获得${results.length}条结果。实际检索词：${escapeHtml((workspace.publicSearchQueries || [workspace.publicSearchQuery]).filter(Boolean).join("；"))}${workspace.publicSearchCached ? "（部分或全部命中缓存）" : ""}` : topic ? `当前题目：${escapeHtml(topic)}` : "请先确认研究题目。"}</div>
+        ${platformInternalSearchHtml(searchType, workspace.publicSearchQueries || [workspace.publicSearchQuery || topic])}
+        <div class="web-search-results">${publicSearchResultsHtml(results, matchMode)}</div>
+        <details class="drawer manual-import-drawer" id="manualPublicImportDrawer"><summary>搜索未覆盖或正文提取失败：手动导入文字、链接或截图</summary><div class="drawer-body">
+          <div class="notice">操作方法：先在搜索结果中点击“打开原文” → 电脑端拖动选中文字并按 Ctrl+C，手机/平板长按文字选择“复制” → 回到本系统，在“正文或选定评论”框中按 Ctrl+V或长按选择“粘贴” → 点击“匿名化并保存”。只复制与研究问题有关的段落和评论。</div>
           <div class="collection-split">
             <div class="panel">
               <h3>手动导入一条公开内容</h3>
               <div class="compact-form-grid"><div class="field"><label>平台</label><select id="publicPlatform"><option>小红书</option><option>知乎</option><option>微博</option><option>公开论坛</option><option>投诉平台</option><option>新闻网站</option><option>机构报告</option><option>其他公开网页</option></select></div><div class="field"><label>发布日期</label><input id="publicDate" type="date"></div></div>
+              <div class="field"><label>材料标题</label><input id="publicTitle" type="text" placeholder="填写帖子、新闻或报告标题；无法确认时可稍后补充"></div>
               <div class="field"><label>公开链接</label><input id="publicUrl" type="url" placeholder="只填写公开可访问的来源链接"></div>
               <div class="field"><label>正文或选定评论</label><textarea id="publicText" style="min-height:180px;" placeholder="粘贴与研究问题有关的公开内容，不要导入私信、用户名和联系方式。"></textarea></div>
               <div class="field"><label>截图OCR（可选）</label><input id="publicImage" type="file" accept="image/*"><p class="hint">截图识别会把图片发送给当前接入的模型。上传前请裁掉头像、账号和其他身份信息。</p></div>
@@ -6026,8 +6046,29 @@ ${limitMethodContext(recent, 5000)}
         </div></details>`;
     }
 
-    function publicSearchResultsHtml(results) {
+    function platformInternalSearchHtml(type, queries) {
+      const query = encodeURIComponent(String((queries || []).find(Boolean) || collectionResearchContext().topic || "").slice(0, 100));
+      if (!query) return "";
+      const links = {
+        xhs: `https://www.xiaohongshu.com/search_result?keyword=${query}`,
+        zhihu: `https://www.zhihu.com/search?type=content&q=${query}`,
+        weibo: `https://s.weibo.com/weibo?q=${query}`
+      };
+      if (!links[type]) return "";
+      return `<div class="platform-search-actions"><a class="btn" href="${links[type]}" target="_blank" rel="noopener">在${publicSearchTypeMeta[type].label}站内继续搜索</a><span class="hint">站内搜索能补充未被全网搜索引擎收录的内容，找到后可在下方手动导入。</span></div>`;
+    }
+
+    function publicSearchResultsHtml(results, mode = "strict") {
       if (!results.length) return "";
+      const threshold = mode === "expand" ? 45 : 65;
+      const high = results.filter((result) => Number(result.aiScore || Math.round(Number(result.score || 0) * 100)) >= threshold);
+      const low = results.filter((result) => !high.includes(result));
+      const highHtml = high.length ? publicSearchResultCards(high) : `<div class="notice warn">当前没有达到${threshold}分的结果。可切换“扩展发现”，或使用上方平台站内搜索。</div>`;
+      const lowHtml = low.length ? `<details class="drawer low-match-drawer"><summary>查看低匹配结果（${low.length}条）</summary><div class="drawer-body web-search-results">${publicSearchResultCards(low)}</div></details>` : "";
+      return `${highHtml}${lowHtml}`;
+    }
+
+    function publicSearchResultCards(results) {
       return results.map((result, index) => {
         const score = Number.isFinite(Number(result.aiScore)) ? Number(result.aiScore) : Math.round(Number(result.score || 0) * 100);
         return `<article class="web-result"><div class="web-result-head"><div><h4>${index + 1}. ${escapeHtml(result.title)}</h4><div class="source-meta"><span class="tag">${escapeHtml(result.site || "公开网页")}</span><span class="tag">${escapeHtml(result.date || "日期待确认")}</span><span class="tag">${escapeHtml(result.authority || "来源待核查")}</span></div></div><div class="web-result-score">${score || "--"}${score ? "分" : ""}</div></div><p>${escapeHtml((result.passage || "暂无摘要").slice(0, 420))}</p>${result.aiReason ? `<div class="web-result-reason">AI判断：${escapeHtml(result.aiReason)}</div>` : ""}<div class="web-result-actions"><a class="btn" href="${escapeHtml(result.url)}" target="_blank" rel="noopener">打开原文</a><button class="btn" data-import-search-summary="${escapeHtml(result.id)}" type="button">导入摘要</button><button class="btn primary" data-extract-search-article="${escapeHtml(result.id)}" type="button">尝试提取正文</button><button class="btn danger" data-remove-search-result="${escapeHtml(result.id)}" type="button">排除</button></div></article>`;
@@ -6056,18 +6097,30 @@ ${limitMethodContext(recent, 5000)}
       try { return JSON.parse(source.slice(start, end + 1)); } catch (error) { return []; }
     }
 
-    async function optimizePublicSearchQuery(topic, type, extra) {
+    async function optimizePublicSearchQueries(topic, type, extra) {
       const meta = publicSearchTypeMeta[type] || publicSearchTypeMeta.news;
       const fallback = `${topic} ${meta.suffix} ${extra || ""}`.replace(/\s+/g, " ").trim().slice(0, 180);
+      const isSocial = ["xhs", "zhihu", "weibo", "forum"].includes(type);
       try {
-        const content = await callModel(`论文题目：${topic}\n搜索来源：${meta.label}\n补充要求：${extra || "无"}\n请生成一条适合中文互联网搜索引擎的检索语句。必须覆盖题目核心对象、核心现象及常见自然语言表达；不要写解释，不要使用site:，只输出一行，控制在80个汉字以内。`);
-        return String(content || "").replace(/```/g, "").replace(/[\r\n]+/g, " ").replace(/^检索(?:词|式)[：:]?\s*/, "").trim().slice(0, 180) || fallback;
-      } catch (error) { return fallback; }
+        const count = isSocial ? 3 : 2;
+        const style = type === "xhs" ? "采用当事人口吻和生活化短语，例如被架空、被穿小鞋、产假回来没岗位" : type === "zhihu" ? "采用问题式表达和经验讨论，例如怎么办、是什么体验、为什么" : type === "weibo" ? "采用事件和话题表达" : "兼顾正式名称与自然语言表达";
+        const content = await callModel(`论文题目：${topic}\n搜索来源：${meta.label}\n补充要求：${extra || "无"}\n请生成${count}条彼此不同的中文互联网短检索语句。${style}。每条只聚焦一个具体对象或现象，不使用学术化长标题，不要使用site:。只输出JSON字符串数组，例如["检索词1","检索词2"]。`);
+        const queries = cleanModelJson(content).map((item) => String(item || "").trim().slice(0, 100)).filter(Boolean);
+        return queries.length ? queries.slice(0, count) : [fallback];
+      } catch (error) { return [fallback]; }
+    }
+
+    function fallbackSearchScore(topic, result) {
+      const text = `${result.title || ""} ${result.passage || ""}`.toLowerCase();
+      const terms = String(topic || "").replace(/[—–：:（）()、，,。的与及研究影响问题优化分析实证]/g, " ").split(/\s+/).filter((term) => term.length >= 2);
+      const hits = terms.filter((term) => text.includes(term.toLowerCase())).length;
+      const ratio = terms.length ? hits / terms.length : 0;
+      return Math.max(20, Math.min(85, Math.round(30 + ratio * 55)));
     }
 
     async function rankPublicSearchResults(topic, results) {
       if (!results.length) return results;
-      const fallback = results.map((result) => ({ ...result, authority: publicSearchAuthority(result) }));
+      const fallback = results.map((result) => ({ ...result, authority: publicSearchAuthority(result), aiScore: fallbackSearchScore(topic, result), aiReason: "依据题目关键词初步匹配" }));
       try {
         const list = results.map((result, index) => `${index + 1}｜${result.title}｜${result.site}｜${(result.passage || "").slice(0, 260)}`).join("\n");
         const content = await callModel(`论文题目：${topic}\n请评估以下搜索结果与论文题目的研究匹配度。优先考虑研究对象、核心现象、具体事实、来源权威性和可用于论文的证据价值；重复、泛泛普法或仅碰巧出现关键词的结果应降分。\n${list}\n\n只输出JSON数组，不要解释，格式为：[{"index":1,"score":88,"reason":"20字以内理由"}]。必须覆盖每个编号，score为0至100整数。`);
@@ -6140,7 +6193,7 @@ ${limitMethodContext(recent, 5000)}
       const workspace = collectionWorkspace();
       const items = workspace.publicItems || [];
       return `
-        <div class="notice">AI只读取匿名文本并生成初步编码。请逐条选择“已复核”或“排除”，AI不能替代学生判断。</div>
+        <div class="notice">这里只显示在“话题收集”中点击过“导入摘要”“提取正文”或“匿名化并保存”的材料。请先逐条选择“已复核纳入”或“排除”，再点击“AI整理与编码”；AI只读取匿名文本，不能替代学生判断。</div>
         <div class="collection-split" style="margin-top:12px;">
           <div class="panel"><h3>人工复核（${items.length}条）</h3><div class="collection-list">${items.length ? items.map((item) => `<div class="collection-item"><strong>${escapeHtml(item.sourceNo)} · ${escapeHtml(item.platform)}</strong><div class="field" style="margin:7px 0 0;"><select data-public-review="${item.id}"><option value="pending" ${item.reviewStatus !== "confirmed" && item.reviewStatus !== "excluded" ? "selected" : ""}>待复核</option><option value="confirmed" ${item.reviewStatus === "confirmed" ? "selected" : ""}>已复核纳入</option><option value="excluded" ${item.reviewStatus === "excluded" ? "selected" : ""}>排除</option></select></div></div>`).join("") : `<div class="notice" style="margin:10px;">请先收集公开话题。</div>`}</div></div>
           <div class="panel"><h3>AI编码结果</h3><div id="publicCodingOutput" class="collection-output">${escapeHtml(workspace.publicCoding || "等待生成。编码将包括阶段、排挤行为、实施主体、伦理问题、员工反应、结果和证据强度。")}</div><div class="row" style="margin-top:10px;"><button class="btn primary" id="generatePublicCodingBtn" type="button" ${items.length ? "" : "disabled"}>AI整理与编码</button><button class="btn" id="exportPublicDataBtn" type="button" ${items.length ? "" : "disabled"}>导出匿名CSV</button></div></div>
@@ -6160,7 +6213,184 @@ ${limitMethodContext(recent, 5000)}
         </div>`;
     }
 
+    function confirmedPublicMaterials() {
+      return (collectionWorkspace().publicItems || []).filter((item) => item.reviewStatus === "confirmed");
+    }
+
+    function publicCorpusId(items) {
+      return `corpus-${simpleHash(items.map((item) => `${item.id}|${simpleHash(item.anonymousText || "")}|${item.reviewStatus}`).sort().join("||"))}`;
+    }
+
+    function publicWordFrequencies(items) {
+      const stopWords = new Set("一个一些这个那个我们你们他们自己可以因为所以但是如果以及并且或者对于进行通过研究问题结果分析材料内容相关主要目前已经没有还是就是比较非常可能需要工作公司员工企业职工女职工平台来源时间情况方面产生影响认为发现表示认为指出其中这种这些一种作为采用基于包括由于同时进一步".match(/.{2,3}/g) || []);
+      ["一个", "一些", "这个", "那个", "我们", "你们", "他们", "自己", "可以", "因为", "所以", "但是", "如果", "以及", "并且", "或者", "对于", "进行", "通过", "研究", "问题", "结果", "分析", "材料", "内容", "相关", "主要", "目前", "已经", "没有", "还是", "就是", "比较", "非常", "可能", "需要", "情况", "方面", "这种", "这些", "一种", "作为", "采用", "基于", "包括", "由于", "同时", "进一步"].forEach((word) => stopWords.add(word));
+      const synonyms = { 架空: "边缘化", 排挤: "边缘化", 冷落: "边缘化", 降工资: "降薪", 工资降低: "降薪", 劝离: "劝退", 逼辞职: "劝退", 工作调整: "调岗", 岗位调整: "调岗" };
+      const counts = new Map();
+      const text = items.map((item) => item.anonymousText || "").join("\n");
+      const tokens = [];
+      if (typeof Intl !== "undefined" && Intl.Segmenter) {
+        const segmenter = new Intl.Segmenter("zh-CN", { granularity: "word" });
+        for (const part of segmenter.segment(text)) if (part.isWordLike) tokens.push(part.segment);
+      } else {
+        tokens.push(...(text.match(/[\u4e00-\u9fa5]{2,8}|[A-Za-z]{3,20}/g) || []));
+      }
+      tokens.forEach((raw) => {
+        let word = String(raw).trim().toLowerCase();
+        word = synonyms[word] || word;
+        if (word.length < 2 || word.length > 10 || stopWords.has(word) || /^\d+$/.test(word)) return;
+        counts.set(word, (counts.get(word) || 0) + 1);
+      });
+      return [...counts.entries()].map(([word, count]) => ({ word, count })).sort((a, b) => b.count - a.count || a.word.localeCompare(b.word)).slice(0, 30);
+    }
+
+    function buildPublicWriteSnapshot() {
+      const workspace = collectionWorkspace();
+      const items = confirmedPublicMaterials();
+      const materials = items.map((item, index) => ({
+        no: index + 1,
+        sourceNo: item.sourceNo || `M${index + 1}`,
+        title: item.title || `${item.platform || "公开网页"}材料（标题待确认）`,
+        date: item.publishDate || "待确认",
+        source: item.platform || "公开网页",
+        url: item.url || "",
+        authority: item.authority || "",
+        contentKind: item.contentKind || "公开文本"
+      }));
+      return {
+        corpusId: publicCorpusId(items),
+        generatedAt: new Date().toLocaleString(),
+        topic: collectionResearchContext().topic,
+        stats: {
+          searchStart: workspace.publicSearchStart || "未限定",
+          searchEnd: workspace.publicSearchEnd || "未限定",
+          searched: (workspace.publicSearchSeenUrls || []).length || (workspace.publicSearchResults || []).length,
+          imported: (workspace.publicItems || []).length,
+          accepted: items.length,
+          excluded: (workspace.publicItems || []).filter((item) => item.reviewStatus === "excluded").length,
+          pending: (workspace.publicItems || []).filter((item) => !item.reviewStatus || item.reviewStatus === "pending").length,
+          platforms: [...new Set(items.map((item) => item.platform).filter(Boolean))],
+          queries: workspace.publicSearchQueries || (workspace.publicSearchQuery ? [workspace.publicSearchQuery] : [])
+        },
+        materials,
+        frequencies: publicWordFrequencies(items)
+      };
+    }
+
+    function publicWriteHtml() {
+      const workspace = collectionWorkspace();
+      const currentItems = confirmedPublicMaterials();
+      const currentCorpusId = publicCorpusId(currentItems);
+      const savedSnapshot = workspace.publicWriteSnapshot || null;
+      const stale = !!savedSnapshot && savedSnapshot.corpusId !== currentCorpusId;
+      const snapshot = savedSnapshot || buildPublicWriteSnapshot();
+      const tab = ["analysis", "materials", "visual"].includes(workspace.publicWriteTab) ? workspace.publicWriteTab : "analysis";
+      return `
+        <div class="notice ${stale ? "corpus-stale" : currentItems.length ? "ok" : "warn"}">${stale ? "已复核材料发生变化，现有文本结论、材料列表和可视化属于旧批次，请重新生成。" : currentItems.length ? `当前分析批次包含${currentItems.length}篇已复核材料。三个页面共享同一材料批次和版本。` : "尚无“已复核纳入”的材料。请返回AI整理编码完成复核。"}</div>
+        <div class="write-paper-tabs"><button class="btn ${tab === "analysis" ? "active" : ""}" data-public-write-tab="analysis" type="button">文本分析结果</button><button class="btn ${tab === "materials" ? "active" : ""}" data-public-write-tab="materials" type="button">文本材料列表</button><button class="btn ${tab === "visual" ? "active" : ""}" data-public-write-tab="visual" type="button">可视化分析结果</button></div>
+        <div id="publicWriteStage">${publicWriteStageHtml(tab, snapshot, stale)}</div>`;
+    }
+
+    function publicWriteStageHtml(tab, snapshot, stale) {
+      const workspace = collectionWorkspace();
+      if (tab === "materials") return `
+        <h3>文本材料列表</h3><p class="hint">列表与文本分析、可视化使用同一批材料。涉及个人敏感经历的社交平台链接，公开论文中建议改用来源编号，完整URL作为研究底稿留存。</p>
+        <div class="table-wrap"><table class="material-paper-table"><thead><tr><th>编号</th><th>材料标题</th><th>发布时间</th><th>来源</th><th>链接</th></tr></thead><tbody>${snapshot.materials.length ? snapshot.materials.map((item) => `<tr><td>${item.no}</td><td>${escapeHtml(item.title)}</td><td>${escapeHtml(item.date)}</td><td>${escapeHtml(item.source)}</td><td>${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">打开链接</a>` : "无"}</td></tr>`).join("") : `<tr><td colspan="5">暂无已复核材料</td></tr>`}</tbody></table></div>
+        <div class="row" style="margin-top:10px;"><button class="btn primary" id="downloadPublicMaterialsDocBtn" type="button" ${snapshot.materials.length && !stale ? "" : "disabled"}>下载Word材料表</button><button class="btn" id="downloadPublicMaterialsCsvBtn" type="button" ${snapshot.materials.length && !stale ? "" : "disabled"}>下载CSV</button></div>`;
+      if (tab === "visual") return `
+        <h3>可视化分析结果</h3><p class="hint">词频来自已复核匿名文本，自动去除常见虚词并合并部分同义表达。图表只能说明本批网络文本中的主题分布，不能表示总体发生率。</p>
+        <div class="visualization-panel"><canvas id="publicTextVisualCanvas" width="1200" height="700"></canvas></div>
+        <div class="row" style="margin-top:10px;"><button class="btn primary" id="downloadPublicVisualBtn" type="button" ${snapshot.frequencies.length && !stale ? "" : "disabled"}>下载PNG图表</button><button class="btn" id="downloadPublicFrequencyCsvBtn" type="button" ${snapshot.frequencies.length && !stale ? "" : "disabled"}>下载词频CSV</button></div>`;
+      return `
+        <h3>文本分析结果</h3>
+        <div class="result" style="min-height:0; margin-bottom:10px;">检索范围：${escapeHtml(snapshot.stats.searchStart)} 至 ${escapeHtml(snapshot.stats.searchEnd)}｜检索发现：${snapshot.stats.searched}条｜导入：${snapshot.stats.imported}条｜采纳：${snapshot.stats.accepted}条｜排除：${snapshot.stats.excluded}条｜待复核：${snapshot.stats.pending}条</div>
+        <textarea id="publicWriteAnalysisOutput" class="coach-output" readonly>${escapeHtml(workspace.publicWriteAnalysis || "点击生成后，系统将以论文口吻说明检索范围、筛选与编码方法、主要主题和研究局限；所有数量由程序计算，AI不得自行编造。")}</textarea>
+        <div class="row" style="margin-top:10px;"><button class="btn primary" id="generatePublicWriteBtn" type="button" ${snapshot.stats.accepted && workspace.publicCoding ? "" : "disabled"}>生成论文式文本分析</button><button class="btn" id="downloadPublicAnalysisBtn" type="button" ${workspace.publicWriteAnalysis && !stale ? "" : "disabled"}>下载Word文档</button></div>
+        ${!workspace.publicCoding ? `<div class="notice warn" style="margin-top:10px;">请先在“AI整理编码”中生成编码结果，再生成论文式分析。</div>` : ""}`;
+    }
+
+    function publicMaterialsTableDoc(snapshot) {
+      return `<table><thead><tr><th>编号</th><th>材料标题</th><th>发布时间</th><th>来源</th><th>链接</th></tr></thead><tbody>${snapshot.materials.map((item) => `<tr><td>${item.no}</td><td>${escapeHtml(item.title)}</td><td>${escapeHtml(item.date)}</td><td>${escapeHtml(item.source)}</td><td>${item.url ? `<a href="${escapeHtml(item.url)}">${escapeHtml(item.url)}</a>` : "无"}</td></tr>`).join("")}</tbody></table>`;
+    }
+
+    function downloadWordDoc(fileName, title, bodyHtml) {
+      const html = `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:'Microsoft YaHei',sans-serif;font-size:11pt;line-height:1.7;color:#111}h1{font-size:16pt;text-align:center}table{width:100%;border-collapse:collapse;font-size:9.5pt}th,td{border:1px solid #777;padding:4px 5px;vertical-align:top}th{background:#eee}p{margin:6px 0}</style></head><body><h1>${escapeHtml(title)}</h1>${bodyHtml}</body></html>`;
+      downloadTextFile(fileName, html, "application/msword;charset=utf-8");
+    }
+
+    function drawPublicVisualization(snapshot) {
+      const canvas = document.getElementById("publicTextVisualCanvas");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      const width = canvas.width, height = canvas.height;
+      ctx.fillStyle = "#f8fafc"; ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = "#10213b"; ctx.font = "700 30px Microsoft YaHei"; ctx.fillText("网络公开文本高频词与主题分布", 44, 52);
+      ctx.fillStyle = "#64748b"; ctx.font = "16px Microsoft YaHei"; ctx.fillText(`材料批次：${snapshot.corpusId}  已复核材料：${snapshot.stats.accepted}篇`, 44, 82);
+      const colors = ["#2563eb", "#0f766e", "#be4565", "#6d5bd0", "#a15c07", "#0891b2", "#334155"];
+      const max = snapshot.frequencies[0]?.count || 1;
+      let x = 48, y = 145, rowHeight = 0;
+      snapshot.frequencies.slice(0, 22).forEach((item, index) => {
+        const size = Math.round(18 + 36 * item.count / max);
+        ctx.font = `${index < 5 ? 700 : 600} ${size}px Microsoft YaHei`;
+        const wordWidth = ctx.measureText(item.word).width + 28;
+        if (x + wordWidth > 790) { x = 48; y += rowHeight + 24; rowHeight = 0; }
+        ctx.fillStyle = colors[index % colors.length];
+        ctx.fillText(item.word, x, y);
+        x += wordWidth; rowHeight = Math.max(rowHeight, size);
+      });
+      ctx.strokeStyle = "#d7dee9"; ctx.beginPath(); ctx.moveTo(825, 112); ctx.lineTo(825, 650); ctx.stroke();
+      ctx.fillStyle = "#10213b"; ctx.font = "700 21px Microsoft YaHei"; ctx.fillText("高频词列表", 860, 135);
+      snapshot.frequencies.slice(0, 10).forEach((item, index) => {
+        const top = 166 + index * 46;
+        ctx.fillStyle = "#334155"; ctx.font = "15px Microsoft YaHei"; ctx.fillText(`${index + 1}. ${item.word}`, 860, top + 16);
+        ctx.fillStyle = "#e2e8f0"; ctx.fillRect(990, top, 150, 18);
+        ctx.fillStyle = colors[index % colors.length]; ctx.fillRect(990, top, Math.max(8, 150 * item.count / max), 18);
+        ctx.fillStyle = "#334155"; ctx.fillText(String(item.count), 1150, top + 15);
+      });
+      ctx.fillStyle = "#64748b"; ctx.font = "14px Microsoft YaHei"; ctx.fillText("注：频次仅反映本研究纳入的网络公开文本，不代表总体发生率。", 44, 675);
+    }
+
+    function wirePublicWrite() {
+      document.querySelectorAll("[data-public-write-tab]").forEach((button) => button.addEventListener("click", () => {
+        saveCollectionWorkspace({ publicWriteTab: button.dataset.publicWriteTab }, { localOnly: true });
+        setSubContent("collection", "public", publicTopicStudyHtml());
+      }));
+      const workspace = collectionWorkspace();
+      const snapshot = workspace.publicWriteSnapshot || buildPublicWriteSnapshot();
+      if (document.getElementById("publicTextVisualCanvas")) drawPublicVisualization(snapshot);
+      document.getElementById("generatePublicWriteBtn")?.addEventListener("click", async () => {
+        const output = document.getElementById("publicWriteAnalysisOutput");
+        const freshSnapshot = buildPublicWriteSnapshot();
+        const confirmed = confirmedPublicMaterials();
+        output.value = "正在把同一批材料、词频和编码结果组织成论文式表述...";
+        try {
+          const excerpts = confirmed.slice(0, 30).map((item) => `${item.sourceNo}｜${item.title || "标题待确认"}｜${(item.anonymousText || "").slice(0, 500)}`).join("\n\n");
+          const content = await callModel(`你是本科论文文本分析写作指导教师。请根据下面已经人工复核的网络公开材料，以规范论文口吻形成“网络公开文本分析结果”。\n题目：${freshSnapshot.topic}\n程序统计（数字必须原样使用，不得改写或估计）：${JSON.stringify(freshSnapshot.stats)}\n高频词：${freshSnapshot.frequencies.slice(0, 15).map((item) => `${item.word}(${item.count})`).join("、")}\nAI初步编码：${workspace.publicCoding}\n材料摘要：\n${excerpts}\n\n依次写：1.检索范围与资料来源；2.材料筛选、匿名化、AI初步编码与人工复核方法；3.主要主题及其文本依据；4.主题之间的关系或过程；5.与研究题目的联系；6.研究局限。主要结论必须与高频词和编码结果一致。使用“在本研究纳入的网络公开文本中”，不得推断总体发生率，不得虚构引文、数量或因果。控制在1500字以内，不使用Markdown表格。`);
+          saveCollectionWorkspace({ publicWriteSnapshot: freshSnapshot, publicWriteCorpusId: freshSnapshot.corpusId, publicWriteAnalysis: content, publicWriteGeneratedAt: new Date().toISOString() });
+          output.value = content;
+          setSubContent("collection", "public", publicTopicStudyHtml());
+        } catch (error) { output.value = `生成失败：${error.message}`; }
+      });
+      document.getElementById("downloadPublicAnalysisBtn")?.addEventListener("click", () => {
+        const ws = collectionWorkspace();
+        downloadWordDoc("网络公开文本分析结果.doc", "网络公开文本分析结果", `<p>${escapeHtml(ws.publicWriteAnalysis || "").replace(/\n/g, "</p><p>")}</p>`);
+      });
+      document.getElementById("downloadPublicMaterialsDocBtn")?.addEventListener("click", () => downloadWordDoc("网络公开文本材料列表.doc", "网络公开文本材料列表", publicMaterialsTableDoc(snapshot)));
+      document.getElementById("downloadPublicMaterialsCsvBtn")?.addEventListener("click", () => {
+        const rows = [["编号", "材料标题", "发布时间", "来源", "链接"], ...snapshot.materials.map((item) => [item.no, item.title, item.date, item.source, item.url])];
+        downloadTextFile("网络公开文本材料列表.csv", rows.map((row) => row.map(csvCell).join(",")).join("\r\n"), "text/csv;charset=utf-8");
+      });
+      document.getElementById("downloadPublicVisualBtn")?.addEventListener("click", () => {
+        const canvas = document.getElementById("publicTextVisualCanvas");
+        canvas?.toBlob((blob) => { if (!blob) return; const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = "网络公开文本可视化分析.png"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }, "image/png");
+      });
+      document.getElementById("downloadPublicFrequencyCsvBtn")?.addEventListener("click", () => {
+        const rows = [["关键词", "频次"], ...snapshot.frequencies.map((item) => [item.word, item.count])];
+        downloadTextFile("网络公开文本高频词.csv", rows.map((row) => row.map(csvCell).join(",")).join("\r\n"), "text/csv;charset=utf-8");
+      });
+    }
+
     function wirePublicTopicStudy() {
+      wirePublicWrite();
       document.querySelectorAll("[data-public-step]").forEach((button) => button.addEventListener("click", () => {
         saveCollectionWorkspace({ publicStep: button.dataset.publicStep }, { localOnly: true });
         setSubContent("collection", "public", publicTopicStudyHtml());
@@ -6179,6 +6409,7 @@ ${limitMethodContext(recent, 5000)}
         const status = document.getElementById("publicSearchStatus");
         const topic = collectionResearchContext().topic;
         const type = document.getElementById("publicSearchType").value;
+        const matchMode = document.getElementById("publicSearchMatchMode").value;
         const extra = document.getElementById("publicSearchExtra").value.trim();
         const start = document.getElementById("publicSearchStart").value;
         const end = document.getElementById("publicSearchEnd").value;
@@ -6188,22 +6419,44 @@ ${limitMethodContext(recent, 5000)}
         status.className = "notice";
         status.textContent = "AI正在生成检索式...";
         try {
-          const query = await optimizePublicSearchQuery(topic, type, extra);
-          status.textContent = `正在搜索：${query}`;
+          const queries = await optimizePublicSearchQueries(topic, type, extra);
+          status.textContent = `将运行${queries.length}组检索：${queries.join("；")}`;
           beginAiWait("正在调用腾讯云联网搜索");
-          let search;
+          const gathered = [];
+          const cacheFlags = [];
+          const requestIds = [];
+          const failures = [];
           try {
-            search = await callCloudFunction("searchWeb", {
-              query,
-              site: publicSearchTypeMeta[type]?.site || "",
-              fromTime: start ? Math.floor(new Date(`${start}T00:00:00`).getTime() / 1000) : 0,
-              toTime: end ? Math.floor(new Date(`${end}T23:59:59`).getTime() / 1000) : 0,
-              count
-            });
+            for (const query of queries) {
+              try {
+                const search = await callCloudFunction("searchWeb", {
+                  query,
+                  site: publicSearchTypeMeta[type]?.site || "",
+                  fromTime: start ? Math.floor(new Date(`${start}T00:00:00`).getTime() / 1000) : 0,
+                  toTime: end ? Math.floor(new Date(`${end}T23:59:59`).getTime() / 1000) : 0,
+                  count: 10
+                });
+                gathered.push(...(search.results || []));
+                cacheFlags.push(!!search.cached);
+                if (search.requestId) requestIds.push(search.requestId);
+              } catch (error) { failures.push(`${query}：${error.message}`); }
+            }
           } finally { endAiWait(); }
-          status.textContent = `已找到${search.results?.length || 0}条结果，AI正在判断研究匹配度...`;
-          const ranked = await rankPublicSearchResults(topic, search.results || []);
-          saveCollectionWorkspace({ publicSearchType: type, publicSearchExtra: extra, publicSearchStart: start, publicSearchEnd: end, publicSearchCount: count, publicSearchQuery: query, publicSearchResults: ranked, publicSearchCached: !!search.cached, publicSearchRequestId: search.requestId || "" });
+          if (!gathered.length) throw new Error(failures[0] || "没有找到可用结果");
+          const expectedSite = publicSearchTypeMeta[type]?.site || "";
+          const siteFiltered = expectedSite ? gathered.filter((result) => { try { return new URL(result.url).hostname.toLowerCase().endsWith(expectedSite); } catch (error) { return false; } }) : gathered;
+          const unique = [];
+          const seen = new Set();
+          siteFiltered.forEach((result) => {
+            const key = `${String(result.url || "").replace(/[?#].*$/, "")}|${normalizeTopicTitle(result.title)}`;
+            if (!seen.has(key)) { seen.add(key); unique.push(result); }
+          });
+          status.textContent = `合并去重后${unique.length}条，AI正在判断研究匹配度...`;
+          const ranked = (await rankPublicSearchResults(topic, unique.slice(0, 40))).slice(0, count);
+          const beforeSearch = collectionWorkspace();
+          const seenUrls = new Set(beforeSearch.publicSearchSeenUrls || []);
+          unique.forEach((result) => { if (result.url) seenUrls.add(result.url); });
+          saveCollectionWorkspace({ publicSearchType: type, publicSearchMatchMode: matchMode, publicSearchExtra: extra, publicSearchStart: start, publicSearchEnd: end, publicSearchCount: count, publicSearchQueries: queries, publicSearchQuery: queries[0] || "", publicSearchResults: ranked, publicSearchCached: cacheFlags.length > 0 && cacheFlags.every(Boolean), publicSearchRequestId: requestIds.join(","), publicSearchFailures: failures, publicSearchSeenUrls: [...seenUrls].slice(-500) });
           setSubContent("collection", "public", publicTopicStudyHtml());
         } catch (error) {
           status.className = "notice warn";
@@ -6235,7 +6488,21 @@ ${limitMethodContext(recent, 5000)}
           status.textContent = outcome.message;
         } catch (error) {
           status.className = "notice warn";
-          status.textContent = `正文提取失败：${error.message}。请打开原文后使用手动导入。`;
+          status.textContent = `正文提取失败：${error.message}。系统已展开手动导入区并带入链接；请先打开原文，复制相关文字后粘贴保存，或直接点击“导入摘要”。`;
+          const drawer = document.getElementById("manualPublicImportDrawer");
+          if (drawer) drawer.open = true;
+          const urlInput = document.getElementById("publicUrl");
+          if (urlInput) urlInput.value = result.url || "";
+          const titleInput = document.getElementById("publicTitle");
+          if (titleInput) titleInput.value = result.title || "";
+          const platformSelect = document.getElementById("publicPlatform");
+          const platformLabel = publicSearchTypeMeta[workspace.publicSearchType]?.label || "其他公开网页";
+          if (platformSelect && [...platformSelect.options].some((option) => option.value === platformLabel)) platformSelect.value = platformLabel;
+          const dateInput = document.getElementById("publicDate");
+          const normalizedDate = String(result.date || "").slice(0, 10).replace(/\//g, "-");
+          if (dateInput && /^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) dateInput.value = normalizedDate;
+          drawer?.scrollIntoView({ behavior: "smooth", block: "start" });
+          setTimeout(() => document.getElementById("publicText")?.focus(), 350);
         } finally { endAiWait(); }
       }));
       document.querySelectorAll("[data-remove-search-result]").forEach((button) => button.addEventListener("click", () => {
@@ -6270,7 +6537,7 @@ ${limitMethodContext(recent, 5000)}
         const anonymousText = anonymizePublicText(text);
         const duplicate = workspace.publicItems.some((item) => (url && item.url === url) || simpleHash(item.anonymousText || "") === simpleHash(anonymousText));
         if (duplicate) { status.className = "notice warn"; status.textContent = "这条公开内容可能已经导入，请勿重复保存。"; return; }
-        const item = { id: `public-${Date.now()}`, sourceNo: nextPublicSourceNo(platform, workspace.publicItems), platform, url, publishDate: document.getElementById("publicDate").value, collectedAt: new Date().toLocaleString(), text, anonymousText, imageName: document.getElementById("publicImage")?.files?.[0]?.name || "", reviewStatus: "pending" };
+        const item = { id: `public-${Date.now()}`, sourceNo: nextPublicSourceNo(platform, workspace.publicItems), platform, title: document.getElementById("publicTitle").value.trim() || `${platform}公开材料（标题待确认）`, url, publishDate: document.getElementById("publicDate").value, collectedAt: new Date().toLocaleString(), text, anonymousText, imageName: document.getElementById("publicImage")?.files?.[0]?.name || "", reviewStatus: "pending" };
         saveCollectionWorkspace({ publicItems: [item, ...workspace.publicItems] });
         setSubContent("collection", "public", publicTopicStudyHtml());
       });
