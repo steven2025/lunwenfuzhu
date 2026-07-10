@@ -839,6 +839,135 @@
 
     .floating-preview.show { display: grid; grid-template-rows: auto 1fr; }
 
+    .ai-wait-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 2600;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(235, 241, 248, 0.62);
+      backdrop-filter: blur(7px) saturate(1.08);
+      -webkit-backdrop-filter: blur(7px) saturate(1.08);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity .22s ease, visibility .22s ease;
+    }
+
+    .ai-wait-overlay.show {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    .ai-wait-overlay.dissolve {
+      animation: aiOverlayDissolve .52s ease forwards;
+      pointer-events: none;
+    }
+
+    .ai-wait-panel {
+      width: min(310px, 86vw);
+      padding: 22px 22px 18px;
+      border: 1px solid rgba(125, 151, 183, .42);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .86);
+      box-shadow: 0 26px 70px rgba(15, 23, 42, .2), inset 0 1px 0 rgba(255,255,255,.95);
+      text-align: center;
+      transform-style: preserve-3d;
+      animation: aiPanelEnter .28s ease both;
+    }
+
+    .ai-clock-scene {
+      width: 174px;
+      height: 174px;
+      margin: 0 auto 13px;
+      perspective: 680px;
+    }
+
+    .ai-clock {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: 1px solid rgba(41, 83, 130, .42);
+      background: rgba(241, 247, 251, .76);
+      box-shadow: 0 20px 36px rgba(15, 60, 95, .2), inset 0 0 0 8px rgba(255,255,255,.66), inset 0 -16px 28px rgba(17, 111, 112, .08);
+      transform: rotateX(8deg) rotateY(-5deg);
+    }
+
+    .ai-clock::before,
+    .ai-clock::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .ai-clock::before { width: 128px; height: 128px; border: 1px solid rgba(51, 93, 135, .16); }
+    .ai-clock::after { width: 10px; height: 10px; background: #0f766e; box-shadow: 0 0 0 5px rgba(15,118,110,.13); z-index: 4; }
+
+    .ai-clock-mark {
+      position: absolute;
+      left: 50%;
+      top: 8px;
+      width: 2px;
+      height: 11px;
+      border-radius: 2px;
+      background: #315b82;
+      transform-origin: 1px 78px;
+      transform: translateX(-50%) rotate(calc(var(--mark) * 30deg));
+      opacity: .72;
+    }
+
+    .ai-clock-mark:nth-child(3n) { width: 3px; height: 15px; background: #0f766e; }
+
+    .ai-clock-hand {
+      position: absolute;
+      left: 50%;
+      bottom: 50%;
+      border-radius: 4px;
+      transform-origin: 50% 100%;
+      z-index: 3;
+    }
+
+    .ai-clock-minute { width: 4px; height: 50px; margin-left: -2px; background: #173b5d; transform: rotate(42deg); }
+    .ai-clock-second { width: 2px; height: 62px; margin-left: -1px; background: #0f9f91; animation: aiSecondSweep 60s linear infinite; }
+
+    .ai-wait-time {
+      color: #102b46;
+      font-size: 28px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0;
+    }
+
+    .ai-wait-task { margin-top: 5px; color: #31516f; font-size: 14px; font-weight: 700; }
+    .ai-wait-note { margin-top: 5px; color: #728196; font-size: 12px; }
+
+    @keyframes aiSecondSweep { to { transform: rotate(360deg); } }
+    @keyframes aiPanelEnter { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    @keyframes aiOverlayDissolve { 0% { opacity: 1; filter: blur(0); } 65% { opacity: .28; filter: blur(5px); } 100% { opacity: 0; filter: blur(12px); visibility: hidden; } }
+
+    @media (max-width: 700px) {
+      .ai-wait-panel { width: min(270px, 88vw); padding: 18px; }
+      .ai-clock-scene { width: 122px; height: 122px; }
+      .ai-clock-mark { top: 6px; height: 8px; transform-origin: 1px 55px; }
+      .ai-clock-mark:nth-child(3n) { height: 11px; }
+      .ai-clock::before { width: 88px; height: 88px; }
+      .ai-clock-minute { height: 35px; }
+      .ai-clock-second { height: 43px; }
+      .ai-wait-time { font-size: 24px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .ai-clock-second, .ai-wait-panel, .ai-wait-overlay.dissolve { animation: none !important; }
+      .ai-wait-overlay { transition: opacity .15s ease; }
+      .ai-wait-overlay.dissolve { opacity: 0; visibility: hidden; }
+    }
+
     .floating-head {
       background: linear-gradient(135deg, #0f172a, #1d4ed8);
       color: #fff;
@@ -1399,12 +1528,35 @@
     </div>
   </div>
 
+  <div id="aiWaitOverlay" class="ai-wait-overlay" aria-hidden="true" aria-live="polite">
+    <div class="ai-wait-panel">
+      <div class="ai-clock-scene" aria-hidden="true">
+        <div class="ai-clock">
+          <i class="ai-clock-mark" style="--mark:0"></i><i class="ai-clock-mark" style="--mark:1"></i><i class="ai-clock-mark" style="--mark:2"></i><i class="ai-clock-mark" style="--mark:3"></i>
+          <i class="ai-clock-mark" style="--mark:4"></i><i class="ai-clock-mark" style="--mark:5"></i><i class="ai-clock-mark" style="--mark:6"></i><i class="ai-clock-mark" style="--mark:7"></i>
+          <i class="ai-clock-mark" style="--mark:8"></i><i class="ai-clock-mark" style="--mark:9"></i><i class="ai-clock-mark" style="--mark:10"></i><i class="ai-clock-mark" style="--mark:11"></i>
+          <span class="ai-clock-hand ai-clock-minute"></span>
+          <span class="ai-clock-hand ai-clock-second" id="aiClockSecond"></span>
+        </div>
+      </div>
+      <div class="ai-wait-time" id="aiWaitTime">00:00</div>
+      <div class="ai-wait-task" id="aiWaitTask">AI正在生成内容</div>
+      <div class="ai-wait-note">已显示真实等待时间，请稍候</div>
+    </div>
+  </div>
+
   <script>
     const CLOUD_FUNCTION_URL = "https://1311686407-cg9lh2w33z.ap-guangzhou.tencentscf.com";
     const PDF_SIGN_CACHE_VERSION = "pdfjs-v1";
     const TOPIC_DIAGNOSIS_RULE_VERSION = "topic-diagnosis-v2";
     const OUTLINE_RULE_VERSION = "outline-v2";
     let deferredInstallPrompt = null;
+    let aiWaitPending = 0;
+    let aiWaitStartedAt = 0;
+    let aiWaitDelayTimer = null;
+    let aiWaitTicker = null;
+    let aiWaitHideTimer = null;
+    let aiWaitCycle = 0;
 
     const providerConfig = {
       deepseek: { baseUrl: "https://api.deepseek.com/v1/chat/completions", model: "deepseek-chat" },
@@ -2132,24 +2284,104 @@
       document.getElementById("modelStatus").textContent = connected ? "模型已接通" : "模型未接通";
     }
 
+    function aiWaitTaskLabel(prompt) {
+      const text = String(prompt || "");
+      if (/只回复：连接成功/.test(text)) return "正在测试模型连接";
+      if (/拆解|范文/.test(text)) return "正在拆解论文内容";
+      if (/文献综述/.test(text)) return "正在整理文献综述";
+      if (/匹配度|文献筛选/.test(text)) return "正在判断文献匹配度";
+      if (/参考提纲|生成本科毕业论文参考提纲/.test(text)) return "正在生成参考提纲";
+      if (/题目诊断|诊断题目/.test(text)) return "正在诊断论文题目";
+      if (/质量提升途径/.test(text)) return "正在形成论文提升建议";
+      if (/写作建议/.test(text)) return "正在形成写作建议";
+      if (/抽样|幸存者偏差|研究对象/.test(text)) return "正在分析研究对象与抽样";
+      if (/量表|问卷/.test(text)) return "正在整理问卷与量表";
+      if (/访谈提纲|半结构化访谈/.test(text)) return "正在生成访谈提纲";
+      if (/CSV|字段表|数据收集/.test(text)) return "正在生成数据字段";
+      if (/研究方法/.test(text)) return "正在分析研究方法";
+      const page = document.getElementById("pageTitle")?.textContent?.trim();
+      return page ? `正在处理${page}内容` : "AI正在生成内容";
+    }
+
+    function beginAiWait(prompt) {
+      aiWaitPending += 1;
+      if (aiWaitPending > 1) return;
+      aiWaitCycle += 1;
+      aiWaitStartedAt = Date.now();
+      clearTimeout(aiWaitHideTimer);
+      clearTimeout(aiWaitDelayTimer);
+      const task = document.getElementById("aiWaitTask");
+      if (task) task.textContent = aiWaitTaskLabel(prompt);
+      updateAiWaitTime();
+      aiWaitDelayTimer = setTimeout(showAiWaitOverlay, 280);
+    }
+
+    function showAiWaitOverlay() {
+      if (!aiWaitPending) return;
+      const overlay = document.getElementById("aiWaitOverlay");
+      const hand = document.getElementById("aiClockSecond");
+      if (!overlay) return;
+      overlay.classList.remove("dissolve");
+      overlay.classList.add("show");
+      overlay.setAttribute("aria-hidden", "false");
+      if (hand) {
+        hand.style.animation = "none";
+        void hand.offsetWidth;
+        hand.style.animation = "";
+      }
+      clearInterval(aiWaitTicker);
+      aiWaitTicker = setInterval(updateAiWaitTime, 250);
+    }
+
+    function updateAiWaitTime() {
+      const elapsed = Math.max(0, Math.floor((Date.now() - aiWaitStartedAt) / 1000));
+      const minutes = String(Math.floor(elapsed / 60)).padStart(2, "0");
+      const seconds = String(elapsed % 60).padStart(2, "0");
+      const time = document.getElementById("aiWaitTime");
+      if (time) time.textContent = `${minutes}:${seconds}`;
+    }
+
+    function endAiWait() {
+      aiWaitPending = Math.max(0, aiWaitPending - 1);
+      if (aiWaitPending) return;
+      clearTimeout(aiWaitDelayTimer);
+      clearInterval(aiWaitTicker);
+      aiWaitHideTimer = setTimeout(() => {
+        const overlay = document.getElementById("aiWaitOverlay");
+        if (!overlay || !overlay.classList.contains("show")) return;
+        const closingCycle = aiWaitCycle;
+        overlay.classList.add("dissolve");
+        setTimeout(() => {
+          if (aiWaitPending || aiWaitCycle !== closingCycle) return;
+          overlay.classList.remove("show", "dissolve");
+          overlay.setAttribute("aria-hidden", "true");
+        }, 540);
+      }, 70);
+    }
+
     async function callModel(userPrompt, systemPrompt) {
       const saved = JSON.parse(localStorage.getItem("thesisModelConfig") || "{}");
       if (!saved.baseUrl || !saved.modelName || !saved.apiKey || saved.modelName.includes("请填入")) throw new Error("模型配置不完整");
-      const response = await fetch(saved.baseUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + saved.apiKey },
-        body: JSON.stringify({
-          model: saved.modelName,
-          messages: [
-            { role: "system", content: systemPrompt || "你是本科毕业论文过程指导助教。请用中文回答，强调是什么、为什么、怎么做、产出和常见坑。" },
-            { role: "user", content: userPrompt }
-          ],
-          temperature: 0.4
-        })
-      });
-      if (!response.ok) throw new Error("HTTP " + response.status + "：" + (await response.text()).slice(0, 160));
-      const data = await response.json();
-      return data.choices?.[0]?.message?.content || JSON.stringify(data);
+      beginAiWait(userPrompt);
+      try {
+        const response = await fetch(saved.baseUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + saved.apiKey },
+          body: JSON.stringify({
+            model: saved.modelName,
+            messages: [
+              { role: "system", content: systemPrompt || "你是本科毕业论文过程指导助教。请用中文回答，强调是什么、为什么、怎么做、产出和常见坑。" },
+              { role: "user", content: userPrompt }
+            ],
+            temperature: 0.4
+          })
+        });
+        if (!response.ok) throw new Error("HTTP " + response.status + "：" + (await response.text()).slice(0, 160));
+        const data = await response.json();
+        return data.choices?.[0]?.message?.content || JSON.stringify(data);
+      } finally {
+        endAiWait();
+      }
     }
 
     function renderTopicAssistant() {
