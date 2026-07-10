@@ -1430,6 +1430,7 @@
     let adminSettings = JSON.parse(localStorage.getItem("adminSettings") || "null") || defaultAdminSettings;
     let latestNotice = JSON.parse(localStorage.getItem("latestNotice") || "null") || { content: "", updatedAt: "" };
     let sessionStartedAt = Date.now();
+    let usageFlushInFlight = false;
 
     const user = JSON.parse(localStorage.getItem("thesisUser") || "null");
     let project = {
@@ -1477,12 +1478,13 @@
       localStorage.setItem(userStorageKey(key), value);
     }
 
-    async function callCloudFunction(action, payload) {
+    async function callCloudFunction(action, payload, options = {}) {
       const currentUser = currentLoginUser();
       const response = await fetch(CLOUD_FUNCTION_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, user: currentUser, payload })
+        body: JSON.stringify({ action, user: currentUser, payload }),
+        keepalive: !!options.keepalive
       });
       if (!response.ok) throw new Error("云函数 HTTP " + response.status);
       const data = await response.json();
@@ -1613,7 +1615,7 @@
     });
 
     document.getElementById("logoutBtn").addEventListener("click", () => {
-      recordUsageDuration();
+      recordUsageDuration({ keepalive: true });
       localStorage.removeItem("thesisUser");
       document.getElementById("appShell").classList.add("hidden");
       document.getElementById("loginShell").classList.remove("hidden");
@@ -1699,16 +1701,48 @@
       box.classList.remove("hidden");
     }
 
-    function recordUsageDuration() {
-      const currentUser = JSON.parse(localStorage.getItem("thesisUser") || "null");
-      if (!currentUser?.verified) return;
-      const durationMs = Math.max(0, Date.now() - sessionStartedAt);
-      if (durationMs < 3000) return;
-      callCloudFunction("recordUsage", { durationMs }).catch(() => {});
-      sessionStartedAt = Date.now();
+    function pendingUsageStorageKey() {
+      return userStorageKey("pendingUsageMs");
     }
 
-    window.addEventListener("beforeunload", () => recordUsageDuration());
+    function collectUsageDuration() {
+      const currentUser = JSON.parse(localStorage.getItem("thesisUser") || "null");
+      if (!currentUser?.verified) return 0;
+      const durationMs = Math.max(0, Date.now() - sessionStartedAt);
+      sessionStartedAt = Date.now();
+      if (!durationMs) return 0;
+      const key = pendingUsageStorageKey();
+      const pending = Number(localStorage.getItem(key) || 0) + durationMs;
+      localStorage.setItem(key, String(pending));
+      return pending;
+    }
+
+    async function recordUsageDuration(options = {}) {
+      const currentUser = JSON.parse(localStorage.getItem("thesisUser") || "null");
+      if (!currentUser?.verified) return;
+      collectUsageDuration();
+      if (usageFlushInFlight) return;
+      const key = pendingUsageStorageKey();
+      const durationMs = Number(localStorage.getItem(key) || 0);
+      if (durationMs < 3000) return;
+      usageFlushInFlight = true;
+      try {
+        await callCloudFunction("recordUsage", { durationMs }, options);
+        const latestPending = Number(localStorage.getItem(key) || 0);
+        localStorage.setItem(key, String(Math.max(0, latestPending - durationMs)));
+      } catch (error) {
+        console.warn("usage sync failed", error);
+      } finally {
+        usageFlushInFlight = false;
+      }
+    }
+
+    setInterval(() => recordUsageDuration(), 60000);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") recordUsageDuration({ keepalive: true });
+      else sessionStartedAt = Date.now();
+    });
+    window.addEventListener("pagehide", () => recordUsageDuration({ keepalive: true }));
 
     document.querySelectorAll(".nav-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -3143,8 +3177,9 @@ JSON字段必须包括：
           <div class="panel span-12">
             <div class="field"><label>你初步拟定的题目</label><textarea id="topicDraft" placeholder="请手动输入题目，例如：某公司新员工培训体系优化研究"></textarea></div>
             <div class="level-tabs">
-              <button class="btn primary" id="topicCoachBasicBtn">基本诊断（80分以下）</button>
-              <button class="btn" id="topicCoachImproveBtn">论文质量提升途径（90分以上）</button>
+              <button class="btn primary" id="topicCoachDiagnosisBtn">题目诊断</button>
+              <button class="btn" id="topicCoachBasicBtn">写作建议（80分左右）</button>
+              <button class="btn" id="topicCoachImproveBtn">论文质量提升途径（90分左右）</button>
             </div>
           </div>
           <div class="panel span-12">
@@ -3162,6 +3197,7 @@ JSON字段必须包括：
     }
 
     function wireTopicWork() {
+      document.getElementById("topicCoachDiagnosisBtn").addEventListener("click", () => runTopicCoach("diagnosis"));
       document.getElementById("topicCoachBasicBtn").addEventListener("click", () => runTopicCoach("basic"));
       document.getElementById("topicCoachImproveBtn").addEventListener("click", () => runTopicCoach("improve"));
       renderTopicDiagnosisHistory();
@@ -3174,20 +3210,64 @@ JSON字段必须包括：
           box.value = "请先手动输入“你初步拟定的题目”。";
           return;
         }
-        const levelName = level === "improve" ? "论文质量提升途径（90分以上）" : "基本诊断（80分以下）";
-        box.value = `正在生成${levelName}题目诊断...`;
+        const levelName = level === "diagnosis" ? "题目诊断" : level === "improve" ? "论文质量提升途径（90分左右）" : "写作建议（80分左右）";
+        box.value = level === "diagnosis" ? "正在诊断题目..." : `正在生成${levelName}...`;
         try {
-          const prompt = level === "improve" ? topicImprovePrompt(draft, levelName) : topicBasicPrompt(draft, levelName);
+          if (level === "diagnosis") {
+            const cached = await getCachedTopicTitleDiagnosis(draft);
+            if (cached) {
+              box.value = cached;
+              saveTopicDiagnosis(draft, level, cached, { skipSharedSave: true });
+              saveProject({ topic: draft, stage: "题目待审核", progress: Math.max(project.progress || 0, 25) });
+              return;
+            }
+          }
+          const prompt = level === "diagnosis" ? topicTitleDiagnosisPrompt(draft) : level === "improve" ? topicImprovePrompt(draft, levelName) : topicBasicPrompt(draft, levelName);
           const content = await callModel(prompt);
           box.value = content;
           saveTopicDiagnosis(draft, level, content);
           saveProject({ topic: draft, stage: "题目待审核", progress: Math.max(project.progress || 0, 25) });
         } catch (error) {
-          const content = buildTopicCoachFallback(draft, error.message, level);
+          const content = level === "diagnosis" ? buildTopicTitleDiagnosisFallback(draft, error.message) : buildTopicCoachFallback(draft, error.message, level);
           box.value = content;
           saveTopicDiagnosis(draft, level, content);
           saveProject({ topic: draft, stage: "题目待审核", progress: Math.max(project.progress || 0, 25) });
         }
+    }
+
+    const TOPIC_DIAGNOSIS_RULE_VERSION = "topic-diagnosis-v1";
+
+    function normalizeTopicTitle(title) {
+      return String(title || "")
+        .trim()
+        .replace(/\s+/g, "")
+        .replace(/[—–－]/g, "-")
+        .replace(/[：﹕]/g, ":")
+        .replace(/[（]/g, "(")
+        .replace(/[）]/g, ")")
+        .toLowerCase();
+    }
+
+    function topicDiagnosisCacheId(title) {
+      const source = `${TOPIC_DIAGNOSIS_RULE_VERSION}|${project.major || "未选择专业"}|${normalizeTopicTitle(title)}`;
+      let hash = 2166136261;
+      for (let i = 0; i < source.length; i += 1) {
+        hash ^= source.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      return `${TOPIC_DIAGNOSIS_RULE_VERSION}-${(hash >>> 0).toString(16)}`;
+    }
+
+    async function getCachedTopicTitleDiagnosis(title) {
+      const normalized = normalizeTopicTitle(title);
+      const localRecord = topicDiagnosisHistory().find((item) => normalizeTopicTitle(item.title) === normalized && item.diagnosis);
+      if (localRecord?.diagnosis) return localRecord.diagnosis;
+      try {
+        const cached = await callCloudFunction("getTopicTitleDiagnosis", { cacheId: topicDiagnosisCacheId(title) });
+        return cached?.content || cached?.payload?.content || "";
+      } catch (error) {
+        return "";
+      }
     }
 
     function topicDiagnosisHistory() {
@@ -3196,7 +3276,7 @@ JSON字段必须包括：
       return JSON.parse(localStorage.getItem("topicDiagnosisHistory") || "[]");
     }
 
-    function saveTopicDiagnosis(title, level, content) {
+    function saveTopicDiagnosis(title, level, content, options = {}) {
       const history = topicDiagnosisHistory();
       const now = new Date().toLocaleString();
       const record = history.find((item) => item.title === title);
@@ -3209,6 +3289,15 @@ JSON字段必须包括：
       setUserStorage("topicDiagnosisHistory", JSON.stringify(history.slice(0, 50)));
       localStorage.setItem("topicDiagnosisHistory", JSON.stringify(history.slice(0, 50)));
       syncCloud("saveTopicDiagnosis", { title, level, content });
+      if (level === "diagnosis" && !options.skipSharedSave) {
+        syncCloud("saveTopicTitleDiagnosisFirst", {
+          cacheId: topicDiagnosisCacheId(title),
+          title,
+          major: project.major || "",
+          ruleVersion: TOPIC_DIAGNOSIS_RULE_VERSION,
+          content
+        });
+      }
       renderTopicDiagnosisHistory();
     }
 
@@ -3226,46 +3315,105 @@ JSON字段必须包括：
         <details class="drawer">
           <summary>${escapeHtml(item.title)} · ${escapeHtml(item.updatedAt || item.createdAt || "")}</summary>
           <div class="drawer-body">
-            <h4>基本诊断（80分以下）</h4>
+            <h4>题目诊断</h4>
+            <div class="result">${escapeHtml(item.diagnosis || "尚未生成。")}</div>
+            <h4 style="margin-top:12px;">写作建议（80分左右）</h4>
             <div class="result">${escapeHtml(item.basic || "尚未生成。")}</div>
-            <h4 style="margin-top:12px;">论文质量提升途径（90分以上）</h4>
+            <h4 style="margin-top:12px;">论文质量提升途径（90分左右）</h4>
             <div class="result">${escapeHtml(item.improve || "尚未生成。")}</div>
           </div>
         </details>`).join("");
     }
 
+    function topicTitleDiagnosisPrompt(draft) {
+      return `你是一名严谨、善于追问的本科毕业论文指导教师。请只诊断题目本身，不提供论文提纲、文献篇数、样本量、问卷或完整写作方案。
+学生专业：${project.major || "未选择"}
+学生题目：${draft}
+
+诊断原则：
+1. 不要因为题目看起来完整就直接认可，也不要替学生编造研究意义。
+2. 识别题目中的行业、地区、企业规模、企业性质、年龄/代际、岗位/员工类别、具体企业、特定场景等限定词。逐个判断该限定是“会改变研究问题的必要研究边界”，还是仅因学生容易接触样本而形成的“取样便利边界”。
+3. 每个限定词都要追问：为什么是这一类对象；与非该类对象相比有什么可验证的特殊性；这种特殊性是否会改变核心问题或变量关系；能用什么文献、行业数据或企业资料证明。
+4. 如果只调查一家企业，不得默认它代表整个行业或某类企业。检查题目是否存在由单个案例过度推广到整个群体的问题；代表性不足时，应明确写X企业或“以X企业为例”。
+5. 对“问题与优化”类题目，检查问题是否可被证据证明，不能把现状直接当问题；对“X影响Y”“中介/调节作用”类题目，检查变量角色、方向和作用机制是否有理论依据；对其他类型也检查研究对象、核心问题和预期结果是否对应。
+6. 按本科论文通常标准评价：表述是否规范、对象是否明确、范围是否适中、研究问题是否清楚、研究价值是否成立、资料与数据是否可获得、难度是否可控。
+
+请严格按以下格式简洁输出，总字数尽量控制在700字以内：
+一、诊断结论：用“可以保留 / 修改后可用 / 建议重新拟定”三选一，并用2-3句话说明。
+二、关键问题：按重要程度列出不超过5点，每一点必须紧扣题目中的具体词语。
+三、限定词检查：逐个写“限定词｜是否必要｜学生必须证明什么”。没有限定词则写“无明显多余限定”。
+四、代表性与边界：说明结论可以适用于谁，不能轻易推广到谁。
+五、确定题目前必须回答：提出3-5个学生需要用文献或事实回答的问题。
+六、建议题目：仅在确有必要时给出1-3个版本，并分别说明适用条件。
+
+例如题目含“互联网企业、新生代员工”时，必须检查这两个限定是否会改变研究关系；学生只是能接触一家互联网企业和年轻员工，不足以证明限定词有研究意义。题目含“小型高新技术企业、一线员工、以X企业为例”时，必须分别检查企业规模、行业属性、员工类别和案例代表性，不能用X企业直接代表整个小型高新技术企业群体。`;
+    }
+
     function topicBasicPrompt(draft, levelName) {
-      return `请对学生初步拟定的本科毕业论文题目进行简洁的导师式基本诊断。
+      return `你是一名本科毕业论文指导教师。题目已经暂定，请只给出完成一篇80分左右本科论文的写作建议，不再评价题目好坏，不修改题目，也不要重复题目诊断。
 项目档案：${JSON.stringify(project, null, 2)}
 学生题目：${draft}
 目标水平：${levelName}
 
-请严格按以下9项输出，语言简洁，不要写成冗长大段，不要模仿“学生喂给AI让AI代写”的口吻：
-1. 题目范围是否适中：如果过大，给出2-3个更合适的题目。
-2. 难度判断：说明对本科生是否过难，难点在哪里。
-3. 研究意义：说明是否有研究意义，意义来自哪里。
-4. 文献收集整理：必须收集哪些类型文献；关键词包括哪些；建议在哪些平台检索。请根据目标水平区分文献广度和文献质量要求。
-5. 数据支撑：最低要求的数据支撑包括哪些；最佳的数据支撑建议是什么。请根据目标水平区分调研范围、样本数量和证据强度。
-6. 论文主要结构：给出适合该题目的主要章节结构。
-7. 问卷与成熟量表：如果需要问卷调研，推荐可检索的成熟量表名称、来源线索或检索链接；不要编造无法核验的具体文献。
-8. 问卷样本量与偏差：给出基于统计规则的基本样本量要求；说明问卷发放如何避免幸存者偏差和便利样本偏差。请根据目标水平区分样本数量和样本来源要求。
-9. 避免把现状当问题：结合该题目说明如何判断“现状”是否真的是“问题”。
+请严格按以下7项输出，语言简洁、建议具体，总字数尽量控制在1000字以内：
+1. 核心研究任务：这篇论文最终必须回答哪些问题、形成什么结果。
+2. 文献准备：必须收集哪些类型文献；检索关键词和平台；文献如何服务于概念、理论、方法和分析。
+3. 数据与资料：最低需要哪些数据；较稳妥的数据组合；分别用来支撑背景、现状/关系、原因和结论中的哪一部分。
+4. 研究方法与步骤：推荐本科生能够执行的方法，并说明每种方法解决什么问题。
+5. 问卷或访谈：如需要，优先推荐可核验的成熟量表名称及来源线索；给出基本样本量、对象覆盖和避免便利样本/幸存者偏差的做法。不要编造文献或链接。
+6. 论文主要结构：给出与该题目匹配的章节结构及各章任务。
+7. 写作底线与常见坑：结合题目指出3-5点，特别说明如何避免把现状直接当问题、让结论超出数据边界或让对策与前文脱节。
 
-基本诊断目标：强调题目可控、文献够用、方法可执行、数据能支撑基本结论，不追求复杂设计。
+目标：文献够用、方法可执行、数据能够支撑基本结论，不追求复杂模型或超出本科生能力的设计。
 
-如果题目属于变量关系实证型，例如“X对Y的影响”“X对Y的影响：Z的调节作用”“X、Y、Z之间关系研究”，请在上述9项之后追加“变量关系实证研究方法补充”，至少包括：
+如果题目属于变量关系实证型，例如“X对Y的影响”“X对Y的影响：Z的调节作用”“X、Y、Z之间关系研究”，请在上述7项之后追加“变量关系实证研究方法补充”，至少包括：
 A. 假设验证型：简要介绍；假设从理论、文献和变量逻辑中如何产生；如何提出H1、H2、H3；变量包括自变量、因变量、中介变量、调节变量、控制变量；基本分析步骤。
 B. 探索因子分析建模型型：简要介绍；适合什么情况；题项如何形成；探索因子分析的基本步骤；如何根据因子形成维度或模型；后续如何做信度、效度和回归/结构关系检验。
 C. 如题目包含调节作用或中介作用，请说明调节/中介的区别、需要收集的数据和基本检验思路。`;
     }
 
+    function buildTopicTitleDiagnosisFallback(draft, errorMessage) {
+      const qualifiers = [];
+      if (/互联网|高新技术|制造业|服务业|旅游|酒店|平台|行业/.test(draft)) qualifiers.push("行业或场景限定");
+      if (/小型|中型|大型|民营|国有|上市/.test(draft)) qualifiers.push("企业规模或性质限定");
+      if (/新生代|Z世代|青年|大学生|一线员工|新员工|实习生|管理者/.test(draft)) qualifiers.push("群体或岗位限定");
+      if (/X企业|X公司|某企业|某公司|为例/.test(draft)) qualifiers.push("具体案例限定");
+      const relation = /影响|中介|调节|关系/.test(draft);
+      const problem = /问题|优化|提升|对策/.test(draft);
+      return `一、诊断结论：修改后可用
+题目已经包含研究对象和核心问题，但仍需证明限定词的必要性，并核对实际样本与题目所声称的研究范围是否一致。
+
+二、关键问题
+1. ${qualifiers.length ? `题目包含${qualifiers.join("、")}，不能只用“方便接触样本”解释。` : "需要进一步明确研究对象和研究边界。"}
+2. ${relation ? "变量之间的方向及中介/调节机制必须有理论和既有文献依据。" : problem ? "必须用目标、标准、比较或结果数据证明问题，不能把某个现状直接当成问题。" : "核心研究问题和预期产出需要对应。"}
+3. 如果资料只来自一家单位，结论原则上只能解释该案例，不能直接代表整个行业或企业类别。
+
+三、限定词检查
+${qualifiers.length ? qualifiers.map((item) => `${item}｜需要论证｜说明它与其他对象有何差异，以及这种差异为何会改变本题的研究问题。`).join("\n") : "无明显多余限定，但仍需说明对象选择依据。"}
+
+四、代表性与边界
+样本来自单个企业时，应在题目中明确X企业或“以X企业为例”；只有取得多家同类企业且结构合理的样本，才适合讨论该类企业的普遍结论。
+
+五、确定题目前必须回答
+1. 为什么必须研究题目中限定的行业、企业或群体？
+2. 与未被限定的对象相比，有什么可以验证的特殊性？
+3. 这种特殊性会不会改变核心问题或变量关系？
+4. 现有文献、行业数据或企业资料能否证明以上判断？
+5. 实际能够获得的数据支持多大范围的结论？
+
+六、建议题目
+若限定词有证据支持，可保留原题；若只有一家企业样本，建议改为以X企业为明确研究主体的版本；若限定词仅来自取样便利，建议删除不能证明的行业或群体标签。
+
+提示：模型服务暂不可用，以上为系统内置题目诊断框架。${errorMessage ? `（${errorMessage}）` : ""}`;
+    }
+
     function topicImprovePrompt(draft, levelName) {
-      return `请在基本诊断基础上，为学生初步拟定的本科毕业论文题目提出“论文质量提升途径”。
+      return `请在题目诊断和80分左右写作建议基础上，为学生初步拟定的本科毕业论文题目提出“论文质量提升途径”。
 项目档案：${JSON.stringify(project, null, 2)}
 学生题目：${draft}
 目标水平：${levelName}
 
-请不要重复基本诊断，不要泛泛而谈。请围绕“如何把普通题目做出更高研究价值”输出。每一条提升建议必须包含三个部分：
+请不要重复题目诊断或基础写作建议，不要泛泛而谈。请围绕“如何把普通题目做出更高研究价值”输出。每一条提升建议必须包含三个部分：
 建议：学生具体应该怎么做。
 为什么：为什么这个做法适合该题目。
 质量意义：它能提升论文的哪一方面质量，如研究对象更丰富、解释力更强、数据支撑更充分、分析更深入、结论更可靠、建议更有针对性。
@@ -3286,53 +3434,39 @@ C. 如题目包含调节作用或中介作用，请说明调节/中介的区别�
     function buildTopicCoachFallback(draft, errorMessage, level = "basic") {
       const needsQuestionnaire = /影响|关系|满意度|意愿|忠诚度|信任|投入|离职|行为|因素/.test(draft);
       const isEmpiricalRelation = /影响|关系|作用|调节|中介|变量|信任|投入|满意度|意愿|忠诚度|离职倾向|创新行为/.test(draft);
-      const isCase = /某|公司|企业|景区|酒店|品牌|平台|优化|对策/.test(draft);
       const improve = level === "improve";
       if (improve) return buildTopicImproveFallback(draft, errorMessage);
-      const scopeAdvice = draft.length > 28
-        ? "题目略长，建议保留研究对象、核心问题和研究结果，删去不必要背景词。"
-        : "题目范围初步可控，但还要确认研究对象、行业场景和数据来源。";
-      const alternatives = isCase
-        ? ["某公司新员工培训体系存在问题及优化研究", "某公司新员工岗位适应培训效果提升研究", "某公司新员工培训内容与岗位胜任匹配研究"]
-        : ["某群体某行为现状及影响因素研究", "某因素对某结果变量的影响研究", "某场景下某群体需求调查研究"];
-      return `基本诊断（80分以下）
+      return `写作建议（80分左右）
 
-1. 题目范围是否适中
-${scopeAdvice}
-可参考收窄题目：
-${alternatives.map((item, index) => `${index + 1}. ${item}`).join("\n")}
+1. 核心研究任务
+围绕“${draft}”明确研究对象、核心问题和预期结论。最终结果必须由实际资料或数据支撑，不能只凭主观判断。
 
-2. 难度判断
-本科可做，重点是控制范围，完成基本证据链。难点在于不能只写感受，必须拿出文献、问卷、访谈、案例材料或二手数据支撑判断。
-
-3. 研究意义
-如果能说明该题目涉及真实管理问题、消费行为变化、服务改进或组织优化，并能取得证据，就有研究意义。
-
-4. 文献收集整理
+2. 文献准备
 文献类型：概念界定类、理论基础类、同类题目实证或案例类、研究方法类。
 一般要求：建议15-25篇，覆盖概念、理论、同类研究和方法即可。
 关键词：题目核心词、研究对象、行业场景、影响因素、优化、问卷、量表。
 平台：知网、万方、维普、学校图书馆数据库、Google Scholar、百度学术。
 
-5. 数据支撑
+3. 数据与资料
 最低要求：至少有文献依据、研究对象基本资料、问卷或访谈中的一种主要证据。最佳建议：文献 + 问卷 + 访谈/案例资料 + 必要业务数据，形成交叉验证。
 
-6. 论文主要结构
-绪论；文献综述与理论基础；研究设计；现状或数据分析；问题与原因；建议；结论。
+4. 研究方法与步骤
+先用文献分析形成概念和分析框架，再根据题目选择问卷、访谈、案例资料或二手数据；完成数据清理、描述与必要的关系/差异分析，最后让结论逐项回应研究问题。
 
-7. 问卷与成熟量表
+5. 问卷或访谈
 ${needsQuestionnaire ? "建议优先检索成熟量表，不要直接自编。可检索：变量名 + 量表、变量名 + 问卷、变量名 + 信度效度、变量名 + 实证研究。检索平台：知网、万方、Google Scholar。若涉及满意度，可查顾客满意度量表；涉及信任，可查信任量表；涉及购买意愿，可查购买意愿量表；涉及工作投入，可查工作投入量表。" : "如果后续需要问卷，先明确变量或调查维度，再查找成熟量表或同类问卷。"}
-
-8. 问卷样本量与偏差
 基本要求：描述性调查建议不少于100份有效问卷；变量关系或回归分析建议不少于150-200份，且每个变量题项数量不能过多。
 避免偏差：不要只发给熟人、同班同学或已经成功留下来的对象；要覆盖不同年级、岗位、使用频率、入职批次或消费经验群体，特别注意不要只调查“留下来的人”而忽略已经离职、放弃、投诉或未购买的人。
 
-9. 避免把现状当问题
-现状本身不是问题。只有当现状与目标、标准、行业特征、岗位要求或结果数据发生冲突时，才可能成为问题。例如“培训两周”只是事实；如果证据显示培训后仍不能胜任岗位，再去分析培训时长、内容、方式或考核是否构成问题。
+6. 论文主要结构
+绪论；文献综述与理论基础；研究设计；现状或数据分析；问题与原因/关系检验；建议或讨论；结论。
+
+7. 写作底线与常见坑
+不要把现状直接当问题；只有当现状与目标、标准、行业特征、岗位要求或结果数据发生冲突时，才可能成为问题。结论不得超出样本和数据边界，对策必须逐项回应前文已经证实的问题或原因。
 
 ${isEmpiricalRelation ? empiricalMethodSupplement(draft) : ""}
 
-提示：模型服务暂不可用，以上为系统内置诊断框架。${errorMessage ? "（" + errorMessage + "）" : ""}`;
+提示：模型服务暂不可用，以上为系统内置写作建议。${errorMessage ? "（" + errorMessage + "）" : ""}`;
     }
 
     function buildTopicImproveFallback(draft, errorMessage) {
@@ -3340,7 +3474,7 @@ ${isEmpiricalRelation ? empiricalMethodSupplement(draft) : ""}
       const objectSuggestion = isIntention
         ? "将研究对象按阶段或群体分层，例如大一至大四、不同使用频率、不同岗位年限、不同消费经验，并加入回顾性问题。"
         : "将研究对象从单一对象扩展为分层对象或对比对象，例如不同部门、不同门店、不同用户群、不同企业类型。";
-      return `论文质量提升途径（90分以上）
+      return `论文质量提升途径（90分左右）
 
 1. 研究对象优化
 建议：${objectSuggestion}
@@ -4174,7 +4308,7 @@ ${docs.map((doc, index) => `文献${index + 1}
 题目：${topic}
 目标：${isExcellent ? "90分左右的论文" : "80分左右的论文"}
 
-基本诊断内容：
+写作建议（80分左右）内容：
 ${diagnosis.basic || "未提供"}
 
 论文质量提升途径：
@@ -4196,7 +4330,7 @@ ${diagnosis.improve || "未提供"}
 2. 二级标题必须使用带括号的中文数字编号：（一）（二）（三）……
 3. 不要使用阿拉伯数字编号，不要使用Markdown表格。
 4. 提纲要符合本科论文写作逻辑，章节数量适中。
-5. ${isExcellent ? "90分左右论文的提纲必须参考基本诊断，并体现论文质量提升途径中的研究对象优化、数据来源拓展、分析方法提升、证据链增强等内容。" : "80分左右论文的提纲主要参考基本诊断，强调题目可控、文献够用、方法可执行、数据能支撑基本结论。"}
+5. ${isExcellent ? "90分左右论文的提纲必须参考写作建议，并体现论文质量提升途径中的研究对象优化、数据来源拓展、分析方法提升、证据链增强等内容。" : "80分左右论文的提纲主要参考写作建议，强调文献够用、方法可执行、数据能支撑基本结论。"}
 6. 最后必须写：以上提纲仅供参考，需要结合你的指导教师意见及能收集到的资料进行修改。祝你写出高质量的论文。`;
     }
 
