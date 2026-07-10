@@ -7,6 +7,7 @@
   <meta name="theme-color" content="#10172a" />
   <meta name="application-name" content="本科论文AI辅助系统" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="论文AI辅助" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="manifest" href="manifest.webmanifest" />
@@ -1868,7 +1869,7 @@
     function renderModel() {
       document.getElementById("model").innerHTML = `
         <div class="grid">
-          <div class="panel span-6">
+          <form class="panel span-6" id="modelConfigForm" onsubmit="return false;">
             <h3>大模型接入</h3>
             <p class="hint">接入方式保持不变：选择模型服务商，输入 API Key，测试是否接通。</p>
             <div class="field"><label>模型服务商</label><select id="provider">
@@ -1881,9 +1882,9 @@
             <div class="field"><label>接口地址</label><input id="baseUrl" type="text"></div>
             <div class="field"><label>模型名称</label><input id="modelName" type="text"></div>
             <div class="field"><label>API Key</label><input id="apiKey" type="password" placeholder="请输入 API Key"></div>
-            <div class="row"><button class="btn primary" id="saveModelBtn">保存配置</button><button class="btn" id="testModelBtn">测试是否接通</button></div>
+            <div class="row"><button class="btn primary" id="saveModelBtn" type="button">保存配置</button><button class="btn" id="testModelBtn" type="button">测试是否接通</button></div>
             <div id="modelResult" class="notice" style="margin-top:14px;">尚未测试模型连接。</div>
-          </div>
+          </form>
           <div class="panel span-6">
             <h3>DeepSeek API Key 获取动画教程</h3>
             <div class="api-tutorial">
@@ -4695,8 +4696,9 @@ ${diagnosis.diagnosis || "未提供；不得自行扩大题目研究对象和结
       const versions = records.filter((item) => item.topic === selectedTopic);
       const selectedRecord = versions.find((item) => item.sourceId === workspace.selectedOutlineId) || versions[0] || null;
       const confirmed = workspace.confirmed?.[methodTopicKey(selectedTopic)] || null;
-      const displayedOutline = confirmed?.outlineSourceId === selectedRecord?.sourceId ? confirmed.outline : selectedRecord?.content || "";
-      const displayedSource = confirmed?.outlineSourceId === selectedRecord?.sourceId ? confirmed.source : "AI参考提纲";
+      const usesConfirmedOutline = !!confirmed && !!selectedRecord && confirmed.outlineSourceId === selectedRecord.sourceId;
+      const displayedOutline = usesConfirmedOutline ? confirmed.outline : selectedRecord?.content || "";
+      const displayedSource = usesConfirmedOutline ? confirmed.source : "AI参考提纲";
       return `
         <h3>选择题目并确认当前研究提纲</h3>
         <p class="hint">这里只列出已经生成过参考提纲的题目。AI参考提纲必须经过确认；如果指导教师修改过，请粘贴修改后的版本再确认。</p>
