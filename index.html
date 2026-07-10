@@ -1433,22 +1433,51 @@
     let usageFlushInFlight = false;
 
     const user = JSON.parse(localStorage.getItem("thesisUser") || "null");
-    let project = {
+    const defaultProject = {
       major: "",
       topic: "",
       topicCategory: "",
       outline: "",
       method: "",
       stage: "选题中",
-      progress: 12,
-      ...JSON.parse(localStorage.getItem("thesisProject") || "{}")
+      progress: 12
     };
+    let project = { ...defaultProject };
 
     function saveProject(patch = {}) {
       project = { ...project, ...patch };
-      localStorage.setItem("thesisProject", JSON.stringify(project));
+      setUserStorage("thesisProject", JSON.stringify(project));
       renderProjectStrip();
       syncCloud("saveProject", project);
+    }
+
+    function loadCurrentUserProject() {
+      try {
+        project = { ...defaultProject, ...JSON.parse(getUserStorage("thesisProject", "{}") || "{}") };
+      } catch (error) {
+        project = { ...defaultProject };
+      }
+    }
+
+    async function hydrateCurrentUserProject() {
+      const currentUser = currentLoginUser();
+      if (!currentUser?.verified) return;
+      try {
+        const cloudProject = await callCloudFunction("getProject", {});
+        if (!cloudProject) return;
+        const savedProject = cloudProject.payload || cloudProject;
+        let localProject = {};
+        try {
+          localProject = JSON.parse(getUserStorage("thesisProject", "{}") || "{}");
+        } catch (error) {
+          localProject = {};
+        }
+        project = { ...defaultProject, ...savedProject, ...localProject };
+        setUserStorage("thesisProject", JSON.stringify(project));
+        renderProjectStrip();
+      } catch (error) {
+        console.warn("project sync failed", error);
+      }
     }
 
     async function syncCloud(action, payload) {
@@ -1557,6 +1586,7 @@
     });
 
     function showApp(role, name) {
+      loadCurrentUserProject();
       document.getElementById("loginShell").classList.add("hidden");
       document.getElementById("appShell").classList.remove("hidden");
       const roleName = role === "teacher" ? "教师" : role === "admin" ? "系统管理员" : "学生";
@@ -1567,12 +1597,16 @@
       document.getElementById("adminNav").classList.toggle("hidden", role !== "admin");
       renderAllModules();
       renderProjectStrip();
+      hydrateCurrentUserProject();
       loadModelState();
       loadPublicAdminState();
       applyModuleAccess();
       if (role === "teacher") activateModule("teacherOverview");
       else if (role === "admin") activateModule("adminSettings");
-      else activateModule("home");
+      else {
+        activateModule("home");
+        hydrateTopicDiagnosisHistory();
+      }
       setTimeout(showInstallReminder, 600);
     }
 
@@ -3272,8 +3306,39 @@ JSON字段必须包括：
 
     function topicDiagnosisHistory() {
       const scoped = getUserStorage("topicDiagnosisHistory", "");
-      if (scoped) return JSON.parse(scoped || "[]");
-      return JSON.parse(localStorage.getItem("topicDiagnosisHistory") || "[]");
+      if (!scoped) return [];
+      try {
+        return JSON.parse(scoped || "[]");
+      } catch (error) {
+        return [];
+      }
+    }
+
+    async function hydrateTopicDiagnosisHistory() {
+      const currentUser = currentLoginUser();
+      if (currentUser.role !== "student") return;
+      try {
+        const cloudHistory = await callCloudFunction("listTopicDiagnosis", {});
+        if (!Array.isArray(cloudHistory)) return;
+        const merged = [...topicDiagnosisHistory()];
+        cloudHistory.forEach((cloudItem) => {
+          const normalized = normalizeTopicTitle(cloudItem.title);
+          const existing = merged.find((item) => normalizeTopicTitle(item.title) === normalized);
+          if (existing) {
+            ["diagnosis", "basic", "improve"].forEach((level) => {
+              if (!existing[level] && cloudItem[level]) existing[level] = cloudItem[level];
+            });
+            existing.updatedAt = existing.updatedAt || cloudItem.updatedAt || cloudItem.createdAt || "";
+          } else {
+            merged.push(cloudItem);
+          }
+        });
+        setUserStorage("topicDiagnosisHistory", JSON.stringify(merged.slice(0, 50)));
+        renderTopicDiagnosisHistory();
+        renderOutlineAssistant();
+      } catch (error) {
+        console.warn("topic history sync failed", error);
+      }
     }
 
     function saveTopicDiagnosis(title, level, content, options = {}) {
@@ -3287,7 +3352,6 @@ JSON字段必须包括：
         history.unshift({ id: Date.now().toString(), title, [level]: content, createdAt: now, updatedAt: now });
       }
       setUserStorage("topicDiagnosisHistory", JSON.stringify(history.slice(0, 50)));
-      localStorage.setItem("topicDiagnosisHistory", JSON.stringify(history.slice(0, 50)));
       syncCloud("saveTopicDiagnosis", { title, level, content });
       if (level === "diagnosis" && !options.skipSharedSave) {
         syncCloud("saveTopicTitleDiagnosisFirst", {
@@ -4227,27 +4291,35 @@ ${docs.map((doc, index) => `文献${index + 1}
 
     function outlineTopicHtml() {
       const history = topicDiagnosisHistory();
-      const selected = selectedOutlineTopic();
+      const storedSelected = selectedOutlineTopic();
+      const selected = history.some((item) => normalizeTopicTitle(item.title) === normalizeTopicTitle(storedSelected)) ? storedSelected : "";
+      if (storedSelected && !selected) setUserStorage("selectedOutlineTopic", "");
       return `
         <h3>选择题目</h3>
         <p class="hint">这次选的是你准备写的论文题目。后面的参考提纲会围绕这个题目生成。</p>
-        <details class="drawer" open>
-          <summary>从历史题目诊断中选择</summary>
-          <div class="drawer-body">
-            <div class="row">${history.map((item) => `<button class="btn" data-outline-topic="${escapeHtml(item.title)}">${escapeHtml(item.title)}</button>`).join("") || `<span class="hint">暂无历史题目，请先到“选题助手-形成候选题目”生成题目诊断。</span>`}</div>
-          </div>
-        </details>
+        <div class="field">
+          <label for="outlineTopicSelect">从历史题目诊断中选择</label>
+          <select id="outlineTopicSelect" ${history.length ? "" : "disabled"}>
+            <option value="">${history.length ? "请选择准备撰写的论文题目" : "暂无历史题目，请先到选题助手生成题目诊断"}</option>
+            ${history.map((item) => `<option value="${escapeHtml(item.title)}" ${normalizeTopicTitle(item.title) === normalizeTopicTitle(selected) ? "selected" : ""}>${escapeHtml(item.title)}</option>`).join("")}
+          </select>
+        </div>
         <div id="outlineTopicCurrent" class="notice" style="margin-top:14px;">${selected ? `你准备撰写的论文题目是：${escapeHtml(selected)}` : "尚未选择准备撰写的论文题目。"}</div>`;
     }
 
     function wireOutlineTopic() {
-      document.querySelectorAll("[data-outline-topic]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const title = btn.dataset.outlineTopic;
-          setUserStorage("selectedOutlineTopic", title);
-          saveProject({ topic: title, stage: "准备提纲", progress: Math.max(project.progress || 0, 35) });
-          document.getElementById("outlineTopicCurrent").textContent = `你准备撰写的论文题目是：${title}`;
-        });
+      const select = document.getElementById("outlineTopicSelect");
+      if (!select) return;
+      select.addEventListener("change", () => {
+        const title = select.value;
+        setUserStorage("selectedOutlineTopic", title);
+        const current = document.getElementById("outlineTopicCurrent");
+        if (!title) {
+          current.textContent = "尚未选择准备撰写的论文题目。";
+          return;
+        }
+        saveProject({ topic: title, stage: "准备提纲", progress: Math.max(project.progress || 0, 35) });
+        current.textContent = `你准备撰写的论文题目是：${title}`;
       });
     }
 
@@ -4286,11 +4358,27 @@ ${docs.map((doc, index) => `文献${index + 1}
           box.value = "未找到该题目的历史诊断，请先到“选题助手-形成候选题目”生成题目诊断。";
           return;
         }
+        if (!diagnosis.basic) {
+          box.value = "该题目还没有“写作建议（80分左右）”。请先到“选题助手-形成候选题目”生成写作建议，再生成提纲。";
+          return;
+        }
+        if (level === "excellent" && !diagnosis.improve) {
+          box.value = "该题目还没有“论文质量提升途径（90分左右）”。请先生成提升途径，再生成90分左右的参考提纲。";
+          return;
+        }
         box.value = level === "excellent" ? "正在生成90分左右论文参考提纲..." : "正在生成80分左右论文参考提纲...";
         try {
+          const cached = await getCachedOutline(topic, diagnosis, level);
+          if (cached) {
+            box.value = cached;
+            setUserStorage(outlineDraftKey(level), cached);
+            saveProject({ topic, outline: cached, stage: "提纲已生成", progress: Math.max(project.progress || 0, 45) });
+            return;
+          }
           const content = await callModel(outlinePrompt(topic, diagnosis, level), "你是本科毕业论文提纲指导教师。请用中文输出结构清晰、符合本科论文规范的提纲。");
           box.value = content;
           setUserStorage(outlineDraftKey(level), content);
+          saveOutlineFirst(topic, diagnosis, level, content);
           saveProject({ topic, outline: content, stage: "提纲已生成", progress: Math.max(project.progress || 0, 45) });
         } catch (error) {
           box.value = "生成失败：" + error.message;
@@ -4298,8 +4386,44 @@ ${docs.map((doc, index) => `文献${index + 1}
       });
     }
 
+    const OUTLINE_RULE_VERSION = "outline-v1";
+
+    function outlineSourceId(topic, diagnosis, level) {
+      const source = [
+        OUTLINE_RULE_VERSION,
+        normalizeTopicTitle(topic),
+        level,
+        diagnosis?.diagnosis || "",
+        diagnosis?.basic || "",
+        level === "excellent" ? diagnosis?.improve || "" : ""
+      ].join("|");
+      return `${OUTLINE_RULE_VERSION}-${simpleHash(source)}`;
+    }
+
+    async function getCachedOutline(topic, diagnosis, level) {
+      const cacheId = outlineSourceId(topic, diagnosis, level);
+      const local = getUserStorage(`outlineFirst_${cacheId}`, "");
+      if (local) return local;
+      try {
+        const cached = await callCloudFunction("getOutlineFirst", { cacheId });
+        const content = cached?.content || cached?.payload?.content || "";
+        if (content) setUserStorage(`outlineFirst_${cacheId}`, content);
+        return content;
+      } catch (error) {
+        return "";
+      }
+    }
+
+    function saveOutlineFirst(topic, diagnosis, level, content) {
+      const cacheId = outlineSourceId(topic, diagnosis, level);
+      setUserStorage(`outlineFirst_${cacheId}`, content);
+      syncCloud("saveOutlineFirst", { cacheId, topic, level, ruleVersion: OUTLINE_RULE_VERSION, content });
+    }
+
     function outlineDraftKey(level) {
-      return `outlineDraft_${level}_${simpleHash(selectedOutlineTopic() || "none")}`;
+      const topic = selectedOutlineTopic();
+      const diagnosis = selectedOutlineDiagnosis();
+      return `outlineDraft_${outlineSourceId(topic || "none", diagnosis || {}, level)}`;
     }
 
     function outlinePrompt(topic, diagnosis, level) {
@@ -4312,7 +4436,10 @@ ${docs.map((doc, index) => `文献${index + 1}
 ${diagnosis.basic || "未提供"}
 
 论文质量提升途径：
-${diagnosis.improve || "未提供"}
+${isExcellent ? diagnosis.improve || "未提供" : "80分左右提纲不使用此部分。"}
+
+题目诊断中已经确定的研究边界：
+${diagnosis.diagnosis || "未提供；不得自行扩大题目研究对象和结论范围。"}
 
 请严格按以下格式输出：
 题目：${topic}
@@ -4331,7 +4458,9 @@ ${diagnosis.improve || "未提供"}
 3. 不要使用阿拉伯数字编号，不要使用Markdown表格。
 4. 提纲要符合本科论文写作逻辑，章节数量适中。
 5. ${isExcellent ? "90分左右论文的提纲必须参考写作建议，并体现论文质量提升途径中的研究对象优化、数据来源拓展、分析方法提升、证据链增强等内容。" : "80分左右论文的提纲主要参考写作建议，强调文献够用、方法可执行、数据能支撑基本结论。"}
-6. 最后必须写：以上提纲仅供参考，需要结合你的指导教师意见及能收集到的资料进行修改。祝你写出高质量的论文。`;
+6. 必须保持前后一致：不得新增前置建议中没有依据的研究对象、变量、数据来源或复杂分析方法；每一个核心章节都要能够在写作建议${isExcellent ? "或质量提升途径" : ""}中找到依据。
+7. 不要在输出中解释你如何保持一致，只输出提纲。
+8. 最后必须写：以上提纲仅供参考，需要结合你的指导教师意见及能收集到的资料进行修改。祝你写出高质量的论文。`;
     }
 
     function outlineSubmodules() {
