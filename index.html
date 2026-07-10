@@ -1402,6 +1402,8 @@
   <script>
     const CLOUD_FUNCTION_URL = "https://1311686407-cg9lh2w33z.ap-guangzhou.tencentscf.com";
     const PDF_SIGN_CACHE_VERSION = "pdfjs-v1";
+    const TOPIC_DIAGNOSIS_RULE_VERSION = "topic-diagnosis-v2";
+    const OUTLINE_RULE_VERSION = "outline-v1";
     let deferredInstallPrompt = null;
 
     const providerConfig = {
@@ -1680,7 +1682,9 @@
 
     async function registerPwaSupport() {
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
-        navigator.serviceWorker.register("./sw.js").catch(() => {});
+        navigator.serviceWorker.register("./sw.js")
+          .then((registration) => registration.update())
+          .catch(() => {});
       }
     }
 
@@ -1961,7 +1965,7 @@
             </select></div>
             <div class="field"><label>接口地址</label><input id="baseUrl" type="text"></div>
             <div class="field"><label>模型名称</label><input id="modelName" type="text"></div>
-            <div class="field"><label>API Key</label><input id="apiKey" type="password" placeholder="请输入 API Key"></div>
+            <div class="field"><label>API Key</label><input id="apiKey" type="password" autocomplete="new-password" spellcheck="false" placeholder="请输入 API Key"></div>
             <div class="row"><button class="btn primary" id="saveModelBtn" type="button">保存配置</button><button class="btn" id="testModelBtn" type="button">测试是否接通</button></div>
             <div id="modelResult" class="notice" style="margin-top:14px;">尚未测试模型连接。</div>
           </form>
@@ -3387,8 +3391,6 @@ JSON字段必须包括：
         }
     }
 
-    const TOPIC_DIAGNOSIS_RULE_VERSION = "topic-diagnosis-v2";
-
     function normalizeTopicTitle(title) {
       return String(title || "")
         .trim()
@@ -4546,8 +4548,6 @@ ${docs.map((doc, index) => `文献${index + 1}
         }
       });
     }
-
-    const OUTLINE_RULE_VERSION = "outline-v1";
 
     function outlineSourceId(topic, diagnosis, level) {
       const source = [
