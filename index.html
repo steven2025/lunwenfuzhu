@@ -452,17 +452,21 @@
       border-left: 4px solid var(--teal);
       background: #f8fafc;
       margin-bottom: 10px;
+      box-shadow: 0 8px 20px rgba(15,23,42,.055);
     }
 
     .method-chat-log {
       height: 520px;
       overflow-y: auto;
-      padding: 14px;
-      border: 1px solid var(--line);
-      background: #f3f6fa;
+      padding: 16px;
+      border: 1px solid #cfd9e8;
+      border-top: 3px solid var(--brand);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
       display: flex;
       flex-direction: column;
       gap: 14px;
+      box-shadow: inset 0 1px 0 #fff, 0 12px 28px rgba(15,23,42,.08);
     }
 
     .chat-message { display: flex; gap: 10px; align-items: flex-start; max-width: 88%; }
@@ -489,14 +493,25 @@
       border-radius: 8px;
       background: #fff;
       border: 1px solid var(--line);
+      border-left: 3px solid var(--brand);
       line-height: 1.72;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
       box-shadow: 0 5px 14px rgba(15,23,42,.055);
     }
-    .chat-message.user .chat-bubble { background: #e8f1ff; border-color: #bfd3fa; }
-    .method-chat-composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; margin-top: 10px; align-items: end; }
-    .method-chat-composer textarea { min-height: 88px; max-height: 180px; }
+    .chat-message.user .chat-bubble { background: #e9f8f6; border-color: #b8ded9; border-left-color: var(--teal); }
+    .method-chat-input-panel {
+      border: 1px solid #cbd7e6;
+      border-top: 3px solid var(--teal);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 10px;
+      margin-bottom: 12px;
+      box-shadow: 0 10px 24px rgba(15,23,42,.075);
+    }
+    .method-chat-composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: stretch; }
+    .method-chat-composer textarea { min-height: 64px; height: 64px; max-height: 120px; padding: 10px 12px; }
+    .method-chat-composer .btn { min-width: 88px; }
     .chat-quick { display: flex; gap: 7px; flex-wrap: wrap; margin: 10px 0; }
     .chat-quick .btn { padding: 7px 10px; min-height: 34px; font-size: 13px; }
     @media (max-width: 700px) {
@@ -504,6 +519,7 @@
       .chat-message { max-width: 96%; }
       .chat-avatar { width: 36px; height: 36px; flex-basis: 36px; }
       .method-chat-composer { grid-template-columns: 1fr; }
+      .method-chat-composer textarea { height: 72px; }
     }
 
     .subnav {
@@ -5101,11 +5117,13 @@ ${diagnosis.diagnosis || "未提供；不得自行扩大题目研究对象和结
         <div class="chat-quick">
           ${["访谈资料如何提取字段和打标签？", "文本资料如何编码并统计？", "成熟量表可以删改题项吗？", "问卷样本量不足怎么办？", "定性资料如何支撑论文结论？", "如何避免只选择支持自己观点的材料？"].map((q) => `<button class="btn" type="button" data-method-quick-question="${escapeHtml(q)}">${escapeHtml(q)}</button>`).join("")}
         </div>
-        <div id="methodChatLog" class="method-chat-log">${methodChatMessagesHtml(messages, userName)}</div>
-        <div class="method-chat-composer">
-          <textarea id="methodChatInput" placeholder="结合当前题目和研究工具提问，例如：如果采用访谈法，如何提取字段、设置标签并进行统计？" ${context ? "" : "disabled"}></textarea>
-          <button class="btn primary" id="sendMethodChatBtn" type="button" ${context ? "" : "disabled"}>发送</button>
+        <div class="method-chat-input-panel">
+          <div class="method-chat-composer">
+            <textarea id="methodChatInput" placeholder="请输入研究方法问题，例如：访谈资料如何设置标签并统计？" ${context ? "" : "disabled"}></textarea>
+            <button class="btn primary" id="sendMethodChatBtn" type="button" ${context ? "" : "disabled"}>发送</button>
+          </div>
         </div>
+        <div id="methodChatLog" class="method-chat-log">${methodChatMessagesHtml(messages, userName)}</div>
         <div class="row" style="margin-top:10px;">
           <button class="btn" id="addMethodChatToPlanBtn" type="button" ${messages.some((item) => item.role === "assistant") ? "" : "disabled"}>将最后回答加入待确认方案</button>
           <button class="btn" id="downloadMethodChatBtn" type="button" ${messages.length ? "" : "disabled"}>下载对话记录</button>
@@ -5207,14 +5225,14 @@ ${limitMethodContext(recent, 5000)}
 学生当前问题：${question}
 
 回答要求：
-1. 先直接回答，再说明为什么、具体怎么做，并结合当前题目举例。
+1. 先直接回答，只保留与当前问题直接相关的内容；不要复述题目、提纲或学生已经知道的背景。
 2. 涉及访谈或文本时，说明分析单位、字段提取、初始标签、标签合并、一级/二级主题、频次或共现统计、返回原文核对，以及如何避免只选择支持观点的材料。
 3. 涉及量表或问卷时，说明题项来源、计分、删改风险、预测试、信效度和对应变量；不得把自编题项称为成熟量表。
 4. 涉及统计分析时，说明需要什么字段、编码方式、分析步骤、能够支持什么结论及不能推出什么。
 5. 明确回答支持提纲中的哪一部分，并指出常见错误。
 6. 信息不足且会显著改变答案时，先提出1-2个针对性问题；能够合理回答时不要反复追问。
 7. 如果建议会改变当前研究方法、对象、样本、工具或字段，结尾标注“【可能影响当前方法方案】”，但不要自动修改方案。
-8. 语言清楚、具体，避免冗长，总字数一般不超过1200字。`;
+8. 语言清楚、具体、短句优先。简单问题控制在300-500字，复杂问题一般不超过700字；能够用3-6个步骤说清楚时不要扩写成长文。`;
     }
 
     function methodRelevantToolContext(question) {
