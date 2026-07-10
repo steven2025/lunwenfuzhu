@@ -381,13 +381,15 @@
     }
 
     .literature-subnav-shell,
-    .method-subnav-shell {
+    .method-subnav-shell,
+    .collection-subnav-shell {
       grid-template-columns: minmax(0, 1fr);
       gap: 10px;
     }
 
     .literature-subnav-shell .subnav,
-    .method-subnav-shell .subnav {
+    .method-subnav-shell .subnav,
+    .collection-subnav-shell .subnav {
       position: static;
       display: flex;
       align-items: center;
@@ -397,13 +399,15 @@
     }
 
     .literature-subnav-shell .subnav h3,
-    .method-subnav-shell .subnav h3 {
+    .method-subnav-shell .subnav h3,
+    .collection-subnav-shell .subnav h3 {
       margin: 0 8px 0 4px;
       flex: 0 0 auto;
     }
 
     .literature-subnav-shell .sub-btn,
-    .method-subnav-shell .sub-btn {
+    .method-subnav-shell .sub-btn,
+    .collection-subnav-shell .sub-btn {
       width: auto;
       margin: 0;
       padding: 8px 12px;
@@ -411,13 +415,101 @@
     }
 
     .literature-subnav-shell .sub-btn.active,
-    .method-subnav-shell .sub-btn.active {
+    .method-subnav-shell .sub-btn.active,
+    .collection-subnav-shell .sub-btn.active {
       box-shadow: inset 0 -3px 0 var(--brand);
     }
 
     .literature-subnav-shell .work-area,
-    .method-subnav-shell .work-area {
+    .method-subnav-shell .work-area,
+    .collection-subnav-shell .work-area {
       min-height: 620px;
+    }
+
+    .collection-steps {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      margin: 8px 0 12px;
+      padding-bottom: 9px;
+      border-bottom: 1px solid var(--line);
+    }
+    .collection-step {
+      border: 1px solid #cbd5e1;
+      border-radius: var(--radius);
+      background: #fff;
+      color: #315071;
+      padding: 7px 10px;
+      min-height: 34px;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .collection-step.active {
+      color: #fff;
+      border-color: transparent;
+      background: linear-gradient(135deg, var(--brand), var(--teal));
+      box-shadow: 0 8px 18px rgba(37,99,235,.18);
+    }
+    .source-card-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .source-card {
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--teal);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 12px;
+      box-shadow: 0 7px 18px rgba(15,23,42,.05);
+    }
+    .source-card h4 { margin: 0 0 6px; font-size: 15px; }
+    .source-card p { margin: 0 0 8px; color: var(--muted); line-height: 1.6; font-size: 13px; }
+    .source-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+    .source-meta .tag { font-size: 12px; }
+    .collection-split {
+      display: grid;
+      grid-template-columns: minmax(390px, .9fr) minmax(520px, 1.35fr);
+      gap: 12px;
+      align-items: start;
+    }
+    .collection-list {
+      max-height: 560px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+    .collection-item {
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .collection-item:last-child { border-bottom: 0; }
+    .collection-item-head { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+    .collection-item small { color: var(--muted); }
+    .collection-item p { margin: 7px 0 0; line-height: 1.55; font-size: 13px; }
+    .collection-output {
+      min-height: 430px;
+      max-height: 620px;
+      overflow: auto;
+      border: 1px dashed #aab4c4;
+      border-radius: var(--radius);
+      padding: 12px;
+      background: #fbfcfe;
+      line-height: 1.72;
+      white-space: pre-wrap;
+    }
+    .compact-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .compact-form-grid .field { margin: 0; }
+    .privacy-flag { color: #9a3412; font-weight: 700; }
+    @media (max-width: 1000px) {
+      .collection-split, .source-card-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 700px) {
+      .compact-form-grid { grid-template-columns: 1fr; }
+      .collection-subnav-shell .subnav { align-items: stretch; }
+      .collection-subnav-shell .subnav h3 { width: 100%; }
+      .collection-subnav-shell .sub-btn { flex: 1 1 42%; text-align: center; }
     }
 
     .method-preview-content {
@@ -1878,6 +1970,7 @@
         hydrateTopicDiagnosisHistory();
         hydrateOutlineRecords();
         hydrateMethodWorkspace();
+        hydrateCollectionWorkspace();
       }
       setTimeout(showInstallReminder, 600);
     }
@@ -2073,7 +2166,7 @@
       renderLiteratureAssistant();
       renderOutlineAssistant();
       renderMethodAssistant();
-      renderStudentAssistant("collection", collectionSubmodules());
+      renderCollectionAssistant();
       renderStudentAssistant("analysis", analysisSubmodules());
       renderTopicAssistant();
       renderSubmissions();
@@ -2442,6 +2535,12 @@
       if (moduleId === "method" && subId === "tools") wireMethodTools();
       if (moduleId === "method" && subId === "chat") wireMethodChat();
       if (moduleId === "method" && subId === "confirm") wireMethodConfirm();
+      if (moduleId === "collection" && subId === "task") wireCollectionTask();
+      if (moduleId === "collection" && subId === "sample") wireCollectionSample();
+      if (moduleId === "collection" && subId === "sources") wireCollectionSources();
+      if (moduleId === "collection" && subId === "public") wirePublicTopicStudy();
+      if (moduleId === "collection" && subId === "records") wireCollectionRecords();
+      if (moduleId === "collection" && subId === "quality") wireCollectionQuality();
     }
 
     function topicLearnHtml() {
@@ -5623,6 +5722,457 @@ ${limitMethodContext(recent, 5000)}
         { id: "match", label: "方法匹配", what: "判断题目和方法是否匹配。", why: "避免数据无法支撑结论。", how: "看研究问题、对象、变量、资料条件。", pitfalls: "方法听起来高级但不可执行。", output: "方法方案和风险提醒。" },
         { id: "tool", label: "工具设计", what: "把方法转化为问卷、访谈提纲或资料清单。", why: "工具决定收集到什么信息。", how: "变量对应题项，问题对应访谈主题。", pitfalls: "题项和研究目标无关。", output: "研究工具草案。" }
       ];
+    }
+
+    function renderCollectionAssistant() {
+      document.getElementById("collection").innerHTML = shellWithSubnav("collection", "数据获取助手", [
+        ["task", "数据任务"],
+        ["sample", "问卷样本服务"],
+        ["sources", "官方与行业数据"],
+        ["public", "网络公开话题研究"],
+        ["records", "已获取数据"],
+        ["quality", "数据质量检查"]
+      ]);
+      setSubContent("collection", "task", collectionTaskHtml());
+      bindSubnav("collection", {
+        task: () => collectionTaskHtml(),
+        sample: () => collectionSampleHtml(),
+        sources: () => collectionSourcesHtml(),
+        public: () => publicTopicStudyHtml(),
+        records: () => collectionRecordsHtml(),
+        quality: () => collectionQualityHtml()
+      });
+    }
+
+    function collectionWorkspace() {
+      try {
+        const saved = JSON.parse(getUserStorage("collectionWorkspace", "{}") || "{}");
+        return {
+          taskMap: "",
+          samplePlan: "",
+          sourceAdvice: "",
+          publicStep: "intro",
+          publicPlan: "",
+          publicCoding: "",
+          publicEthics: "",
+          publicItems: [],
+          records: [],
+          qualityReport: "",
+          ...saved,
+          publicItems: Array.isArray(saved.publicItems) ? saved.publicItems : [],
+          records: Array.isArray(saved.records) ? saved.records : []
+        };
+      } catch (error) {
+        return { taskMap: "", samplePlan: "", sourceAdvice: "", publicStep: "intro", publicPlan: "", publicCoding: "", publicEthics: "", publicItems: [], records: [], qualityReport: "" };
+      }
+    }
+
+    function collectionCloudCopy(workspace) {
+      return {
+        ...workspace,
+        publicItems: (workspace.publicItems || []).map((item) => ({ ...item, text: "", imageName: item.imageName || "" }))
+      };
+    }
+
+    function saveCollectionWorkspace(patch = {}, options = {}) {
+      const current = collectionWorkspace();
+      const next = {
+        ...current,
+        ...patch,
+        publicItems: patch.publicItems || current.publicItems,
+        records: patch.records || current.records,
+        updatedAt: new Date().toISOString()
+      };
+      try {
+        setUserStorage("collectionWorkspace", JSON.stringify(next));
+      } catch (error) {
+        alert("本地存储空间不足，请先导出并删除部分较长的网络文本。");
+      }
+      if (!options.localOnly) syncCloud("saveCollectionWorkspace", collectionCloudCopy(next));
+      return next;
+    }
+
+    async function hydrateCollectionWorkspace() {
+      if (currentLoginUser().role !== "student") return;
+      try {
+        const cloud = await callCloudFunction("getCollectionWorkspace", {});
+        const remote = cloud?.payload || cloud || {};
+        const local = collectionWorkspace();
+        const localItemIds = new Set((local.publicItems || []).map((item) => item.id));
+        const localRecordIds = new Set((local.records || []).map((item) => item.id));
+        const merged = {
+          ...remote,
+          ...local,
+          publicItems: [...(local.publicItems || []), ...(remote.publicItems || []).filter((item) => !localItemIds.has(item.id))],
+          records: [...(local.records || []), ...(remote.records || []).filter((item) => !localRecordIds.has(item.id))]
+        };
+        setUserStorage("collectionWorkspace", JSON.stringify(merged));
+        if (document.getElementById("collection")) renderCollectionAssistant();
+      } catch (error) {
+        console.warn("collection workspace sync failed", error);
+      }
+    }
+
+    function collectionResearchContext() {
+      const confirmed = currentConfirmedMethodContext();
+      const topic = confirmed?.topic || project.topic || topicDiagnosisHistory()[0]?.title || "";
+      return {
+        topic,
+        outline: confirmed?.outline || project.outline || "",
+        methodAdvice: confirmed ? methodOutput("advice") : "",
+        sampling: confirmed ? methodOutput("sampling") : "",
+        tools: confirmed ? ["questionnaire", "scale", "interview", "table"].map((kind) => methodOutput(`tool_${kind}`)).filter(Boolean).join("\n\n") : ""
+      };
+    }
+
+    function collectionTaskHtml() {
+      const context = collectionResearchContext();
+      const workspace = collectionWorkspace();
+      return `
+        <h3>确认这篇论文需要哪些数据</h3>
+        <div class="notice ${context.topic ? "ok" : "warn"}">${context.topic ? `当前题目：${escapeHtml(context.topic)}。系统将结合已经确认的提纲和研究方法生成数据任务。` : "请先在研究方法助手确认题目和提纲。"}</div>
+        <div class="grid" style="margin-top:12px;">
+          <div class="panel span-4"><h3>已继承内容</h3><div class="result">题目：${escapeHtml(context.topic || "未确认")}\n提纲：${context.outline ? "已确认" : "未确认"}\n方法建议：${context.methodAdvice ? "已生成" : "未生成"}\n抽样建议：${context.sampling ? "已生成" : "未生成"}</div></div>
+          <div class="panel span-8"><h3>数据任务表</h3><textarea id="collectionTaskOutput" class="coach-output" readonly>${escapeHtml(workspace.taskMap || "点击下方按钮，生成“研究问题—所需证据—字段—来源—用途”对应表。")}</textarea></div>
+        </div>
+        <button class="btn primary" id="generateCollectionTaskBtn" type="button" ${context.topic ? "" : "disabled"}>AI生成数据任务表</button>`;
+    }
+
+    function wireCollectionTask() {
+      document.getElementById("generateCollectionTaskBtn")?.addEventListener("click", async () => {
+        const context = collectionResearchContext();
+        const output = document.getElementById("collectionTaskOutput");
+        output.value = "正在梳理数据任务...";
+        try {
+          const content = await callModel(`请为本科论文生成简洁、可执行的数据任务表。\n题目：${context.topic}\n确认提纲：${context.outline || "未提供"}\n研究方法建议：${context.methodAdvice || "未提供"}\n抽样建议：${context.sampling || "未提供"}\n\n按以下栏目逐项表达，不使用Markdown表格：\n1.需要回答的研究问题\n2.最低证据及字段\n3.最佳补充证据\n4.真实来源渠道\n5.数据将用于论文哪一部分\n6.不能由这些数据推出什么结论\n区分面上数据、行业数据、研究对象数据和交叉验证数据，控制在1000字以内。`);
+          output.value = content;
+          saveCollectionWorkspace({ taskMap: content });
+        } catch (error) {
+          output.value = `生成失败：${error.message}`;
+        }
+      });
+    }
+
+    function collectionSampleHtml() {
+      const workspace = collectionWorkspace();
+      const topic = collectionResearchContext().topic;
+      return `
+        <h3>问卷样本服务</h3>
+        <div class="notice">适用于无法通过企业、学校或熟人渠道触达的广泛人群。付费样本不等于随机样本，论文仍需说明筛选、配额和局限。</div>
+        <div class="grid" style="margin-top:12px;">
+          <div class="panel span-5">
+            <h3>问卷星操作步骤</h3>
+            <div class="result">1. 完成问卷预测试。\n2. 明确年龄、地区、职业等筛选条件。\n3. 设置有效样本数和配额。\n4. 提交样本需求并获取实时报价。\n5. 确认无效样本替补和质量规则。\n6. 回收后检查答题时长、逻辑矛盾和规律作答。\n7. 在论文中说明样本平台与限制。</div>
+            <div class="row" style="margin-top:10px;"><a class="btn primary" href="https://www.wjx.cn/sample/demandnew.aspx" target="_blank" rel="noopener">打开样本需求</a><a class="btn" href="https://www.wjx.cn/sample/pricenew.aspx?npub=1" target="_blank" rel="noopener">查看官方价格</a></div>
+          </div>
+          <div class="panel span-7">
+            <h3>当前题目的样本方案</h3>
+            <div class="notice">${topic ? `当前题目：${escapeHtml(topic)}` : "尚未确认题目"}</div>
+            <textarea id="collectionSampleOutput" class="coach-output" readonly>${escapeHtml(workspace.samplePlan || "AI将给出目标群体、筛选条件、配额、质量检查和论文披露要求，不编造固定价格。")}</textarea>
+            <button class="btn primary" id="generateSamplePlanBtn" type="button" ${topic ? "" : "disabled"}>AI生成样本服务方案</button>
+          </div>
+        </div>`;
+    }
+
+    function wireCollectionSample() {
+      document.getElementById("generateSamplePlanBtn")?.addEventListener("click", async () => {
+        const context = collectionResearchContext();
+        const output = document.getElementById("collectionSampleOutput");
+        output.value = "正在生成样本服务方案...";
+        try {
+          const content = await callModel(`题目：${context.topic}\n抽样建议：${context.sampling || "未提供"}\n请给出使用付费问卷样本服务的简洁方案：是否有必要、目标人群、筛选题、配额变量、基础样本量建议、无效样本规则、预算询价项目、代表性局限和论文中必须披露的内容。不得编造平台即时价格，提醒以官方报价为准。控制在800字以内。`);
+          output.value = content;
+          saveCollectionWorkspace({ samplePlan: content });
+        } catch (error) { output.value = `生成失败：${error.message}`; }
+      });
+    }
+
+    const verifiedDataSources = [
+      { name: "国家数据", type: "政府统计", url: "https://data.stats.gov.cn/", scope: "人口、就业、收入、消费、地区和行业宏观数据", format: "网页/下载", risk: "权威" },
+      { name: "国家统计局", type: "统计公报", url: "https://www.stats.gov.cn/", scope: "统计年鉴、月度年度数据和专题公报", format: "网页/PDF", risk: "权威" },
+      { name: "人力资源和社会保障部", type: "劳动就业", url: "https://www.mohrss.gov.cn/", scope: "就业、工资、劳动关系和人力资源服务统计", format: "网页/PDF", risk: "权威" },
+      { name: "文化和旅游部数据服务", type: "文旅行业", url: "https://sjfw.mct.gov.cn/", scope: "旅行社、饭店、景区及文旅统计调查报告", format: "网页/报告", risk: "权威" },
+      { name: "巨潮资讯网", type: "上市公司", url: "https://www.cninfo.com.cn/", scope: "上市公司年报、ESG报告、社会责任报告和公告", format: "PDF", risk: "权威" },
+      { name: "最高人民检察院典型案例", type: "权益案例", url: "https://www.spp.gov.cn/spp/xwfbh/dxal/index.shtml", scope: "公益诉讼、劳动权益和妇女权益典型案例", format: "网页", risk: "权威" }
+    ];
+
+    function collectionSourcesHtml() {
+      const workspace = collectionWorkspace();
+      const topic = collectionResearchContext().topic;
+      return `
+        <h3>官方与行业真实数据</h3>
+        <div class="notice">先用AI判断需要什么数据，再从核验过的真实网站获取。网址和价格不由AI临时编造。</div>
+        <div class="source-card-grid" style="margin-top:12px;">${verifiedDataSources.map((source) => `
+          <article class="source-card"><h4>${escapeHtml(source.name)}</h4><div class="source-meta"><span class="tag">${escapeHtml(source.type)}</span><span class="tag">${escapeHtml(source.format)}</span><span class="tag">${escapeHtml(source.risk)}</span></div><p>${escapeHtml(source.scope)}</p><a class="btn" href="${escapeHtml(source.url)}" target="_blank" rel="noopener">打开网站</a></article>`).join("")}</div>
+        <div class="panel" style="margin-top:12px;"><h3>当前题目的渠道建议</h3><div class="notice">${topic ? `当前题目：${escapeHtml(topic)}` : "尚未确认题目"}</div><textarea id="collectionSourceOutput" class="coach-output" readonly>${escapeHtml(workspace.sourceAdvice || "系统将按面上数据、行业报告、研究对象数据和交叉验证数据给出检索步骤。")}</textarea><button class="btn primary" id="generateSourceAdviceBtn" type="button" ${topic ? "" : "disabled"}>AI匹配真实渠道</button></div>`;
+    }
+
+    function wireCollectionSources() {
+      document.getElementById("generateSourceAdviceBtn")?.addEventListener("click", async () => {
+        const context = collectionResearchContext();
+        const output = document.getElementById("collectionSourceOutput");
+        output.value = "正在匹配数据渠道...";
+        try {
+          const sourceList = verifiedDataSources.map((s) => `${s.name}：${s.url}；${s.scope}`).join("\n");
+          const content = await callModel(`题目：${context.topic}\n数据任务：${collectionWorkspace().taskMap || "未生成"}\n系统已核验渠道：\n${sourceList}\n\n请优先使用上述真实渠道，按“面上数据、行业报告、研究对象数据、交叉验证数据”给出：具体搜索词、进入网站后的操作、建议下载字段、数据用于论文哪里。可以建议其他机构类别，但不确定的网址不要编造，只写机构名称和核验建议。控制在1000字以内。`);
+          output.value = content;
+          saveCollectionWorkspace({ sourceAdvice: content });
+        } catch (error) { output.value = `生成失败：${error.message}`; }
+      });
+    }
+
+    function publicTopicStudyHtml() {
+      const workspace = collectionWorkspace();
+      const steps = [["intro", "方法介绍"], ["plan", "研究方案"], ["collect", "话题收集"], ["code", "AI整理编码"], ["ethics", "结果与伦理"]];
+      const active = steps.some(([id]) => id === workspace.publicStep) ? workspace.publicStep : "intro";
+      return `
+        <h3>网络公开话题研究</h3>
+        <div class="collection-steps">${steps.map(([id, label]) => `<button class="collection-step ${id === active ? "active" : ""}" data-public-step="${id}" type="button">${label}</button>`).join("")}</div>
+        <div id="publicStudyStage">${publicStudyStageHtml(active)}</div>`;
+    }
+
+    function publicStudyStageHtml(step) {
+      const workspace = collectionWorkspace();
+      const context = collectionResearchContext();
+      if (step === "intro") return `
+        <div class="grid">
+          <div class="panel span-6"><h3>它是什么</h3><p class="hint">把小红书、知乎、公开论坛等平台中与题目相关的公开叙事作为文本材料，识别经历、行为、原因、结果和观点。</p></div>
+          <div class="panel span-6"><h3>它能回答什么</h3><p class="hint">适合发现隐性问题、形成分类、理解过程，并为访谈和问卷提供线索；不能用热门帖子推断总体发生比例。</p></div>
+          <div class="panel span-6"><h3>怎么做</h3><p class="hint">确定关键词和时间范围，人工确认相关公开内容，导入匿名文本，由AI初步编码，再由学生逐条复核。</p></div>
+          <div class="panel span-6"><h3>主要偏差</h3><p class="hint">愿意发帖者具有自我选择，平台推荐影响可见内容，热门内容可能重复转载。因此网络样本应与判例、报告、访谈或问卷交叉验证。</p></div>
+          <div class="panel span-12"><h3>合规边界</h3><div class="notice warn">不采集私信、私密群组和个人联系方式；不绕过登录、验证码、付费墙或访问限制。当前系统采用公开链接、文本、文件和截图OCR的半自动研究方式。</div></div>
+        </div>`;
+      if (step === "plan") return `
+        <div class="notice ${context.topic ? "ok" : "warn"}">${context.topic ? `当前题目：${escapeHtml(context.topic)}` : "请先确认研究题目"}</div>
+        <div class="panel" style="margin-top:12px;"><h3>网络话题研究方案</h3><textarea id="publicPlanOutput" class="coach-output" readonly>${escapeHtml(workspace.publicPlan || "AI将生成平台、时间、关键词矩阵、纳入标准、字段和初步编码框架。")}</textarea><button class="btn primary" id="generatePublicPlanBtn" type="button" ${context.topic ? "" : "disabled"}>AI生成研究方案</button></div>`;
+      if (step === "collect") return publicCollectHtml();
+      if (step === "code") return publicCodeHtml();
+      return publicEthicsHtml();
+    }
+
+    function publicCollectHtml() {
+      const items = collectionWorkspace().publicItems || [];
+      const topic = collectionResearchContext().topic;
+      const keyword = encodeURIComponent((topic || "三期女职工 隐性排挤").slice(0, 60));
+      return `
+        <div class="notice">按研究方案搜索并人工确认内容。静态网页不能直接读取其他平台页面，可粘贴公开内容，或用支持图片的模型识别截图。</div>
+        <div class="row" style="margin:10px 0;"><a class="btn" href="https://www.xiaohongshu.com/search_result?keyword=${keyword}" target="_blank" rel="noopener">打开小红书搜索</a><a class="btn" href="https://www.zhihu.com/search?type=content&q=${keyword}" target="_blank" rel="noopener">打开知乎搜索</a><button class="btn" id="copyPublicKeywordsBtn" type="button">复制检索方案</button></div>
+        <div class="collection-split">
+          <div class="panel">
+            <h3>导入一条公开内容</h3>
+            <div class="compact-form-grid"><div class="field"><label>平台</label><select id="publicPlatform"><option>小红书</option><option>知乎</option><option>微博</option><option>公开论坛</option><option>投诉平台</option><option>其他公开网页</option></select></div><div class="field"><label>发布日期</label><input id="publicDate" type="date"></div></div>
+            <div class="field"><label>公开链接</label><input id="publicUrl" type="url" placeholder="只填写公开可访问的来源链接"></div>
+            <div class="field"><label>正文或选定评论</label><textarea id="publicText" style="min-height:180px;" placeholder="粘贴与研究问题有关的公开内容，不要导入私信、用户名和联系方式。"></textarea></div>
+            <div class="field"><label>截图OCR（可选）</label><input id="publicImage" type="file" accept="image/*"><p class="hint">截图识别会把图片发送给你当前接入的模型。上传前请裁掉头像、账号和其他身份信息；不确定时请直接粘贴文字。</p></div>
+            <div class="row"><button class="btn" id="publicOcrBtn" type="button">AI识别截图</button><button class="btn primary" id="savePublicItemBtn" type="button">匿名化并保存</button></div>
+            <div id="publicCollectStatus" class="notice" style="margin-top:10px;">粘贴的原文只保存在当前设备；同步到COS和用于编码的是匿名文本。截图OCR需另行遵守上方提醒。</div>
+          </div>
+          <div class="panel"><h3>已收集 ${items.length} 条</h3><div class="collection-list">${publicItemListHtml(items)}</div></div>
+        </div>`;
+    }
+
+    function publicItemListHtml(items) {
+      if (!items.length) return `<div class="notice" style="margin:10px;">尚未收集公开话题。</div>`;
+      return items.map((item) => `<article class="collection-item"><div class="collection-item-head"><div><strong>${escapeHtml(item.sourceNo)}</strong> <span class="tag">${escapeHtml(item.platform)}</span><br><small>${escapeHtml(item.publishDate || item.collectedAt || "")}</small></div><div class="row"><button class="btn danger" data-public-delete="${item.id}" type="button">删除</button></div></div><p>${escapeHtml((item.anonymousText || item.text || "").slice(0, 180))}${(item.anonymousText || item.text || "").length > 180 ? "…" : ""}</p></article>`).join("");
+    }
+
+    function anonymizePublicText(text) {
+      return String(text || "")
+        .replace(/\b1[3-9]\d{9}\b/g, "[手机号已隐藏]")
+        .replace(/\b[1-9]\d{5}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[0-9Xx]\b/g, "[身份证号已隐藏]")
+        .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[邮箱已隐藏]")
+        .replace(/(?:微信号|小红书号|知乎用户名|QQ号?)\s*[：:]?\s*[A-Za-z0-9_-]{4,}/gi, "[账号已隐藏]")
+        .replace(/@[\w\u4e00-\u9fa5_-]{2,24}/g, "@[账号已隐藏]")
+        .trim();
+    }
+
+    async function callVisionModel(file, prompt) {
+      const saved = JSON.parse(localStorage.getItem("thesisModelConfig") || "{}");
+      if (!saved.baseUrl || !saved.modelName || !saved.apiKey) throw new Error("模型配置不完整");
+      if (file.size > 6 * 1024 * 1024) throw new Error("截图超过6MB，请裁剪后再识别");
+      const dataUrl = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); });
+      beginAiWait("AI正在识别截图文字");
+      try {
+        const response = await fetch(saved.baseUrl, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + saved.apiKey }, body: JSON.stringify({ model: saved.modelName, messages: [{ role: "system", content: "你是研究资料OCR助手，只忠实提取图片中的公开文本，不补写不存在的内容。" }, { role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: dataUrl } }] }], temperature: 0.1 }) });
+        if (!response.ok) throw new Error("当前模型可能不支持图片识别（HTTP " + response.status + "）");
+        const data = await response.json();
+        return data.choices?.[0]?.message?.content || "";
+      } finally { endAiWait(); }
+    }
+
+    function nextPublicSourceNo(platform, items) {
+      const prefix = ({ 小红书: "XHS", 知乎: "ZH", 微博: "WB", 公开论坛: "FOR", 投诉平台: "COM" })[platform] || "WEB";
+      const next = Math.max(0, ...items.filter((item) => item.sourceNo?.startsWith(prefix)).map((item) => Number(String(item.sourceNo).slice(prefix.length)) || 0)) + 1;
+      return `${prefix}${String(next).padStart(3, "0")}`;
+    }
+
+    function publicCodeHtml() {
+      const workspace = collectionWorkspace();
+      const items = workspace.publicItems || [];
+      return `
+        <div class="notice">AI只读取匿名文本并生成初步编码。请逐条选择“已复核”或“排除”，AI不能替代学生判断。</div>
+        <div class="collection-split" style="margin-top:12px;">
+          <div class="panel"><h3>人工复核（${items.length}条）</h3><div class="collection-list">${items.length ? items.map((item) => `<div class="collection-item"><strong>${escapeHtml(item.sourceNo)} · ${escapeHtml(item.platform)}</strong><div class="field" style="margin:7px 0 0;"><select data-public-review="${item.id}"><option value="pending" ${item.reviewStatus !== "confirmed" && item.reviewStatus !== "excluded" ? "selected" : ""}>待复核</option><option value="confirmed" ${item.reviewStatus === "confirmed" ? "selected" : ""}>已复核纳入</option><option value="excluded" ${item.reviewStatus === "excluded" ? "selected" : ""}>排除</option></select></div></div>`).join("") : `<div class="notice" style="margin:10px;">请先收集公开话题。</div>`}</div></div>
+          <div class="panel"><h3>AI编码结果</h3><div id="publicCodingOutput" class="collection-output">${escapeHtml(workspace.publicCoding || "等待生成。编码将包括阶段、排挤行为、实施主体、伦理问题、员工反应、结果和证据强度。")}</div><div class="row" style="margin-top:10px;"><button class="btn primary" id="generatePublicCodingBtn" type="button" ${items.length ? "" : "disabled"}>AI整理与编码</button><button class="btn" id="exportPublicDataBtn" type="button" ${items.length ? "" : "disabled"}>导出匿名CSV</button></div></div>
+        </div>`;
+    }
+
+    function publicEthicsHtml() {
+      const workspace = collectionWorkspace();
+      const items = workspace.publicItems || [];
+      const confirmed = items.filter((item) => item.reviewStatus === "confirmed").length;
+      const pending = items.filter((item) => !item.reviewStatus || item.reviewStatus === "pending").length;
+      return `
+        <div class="grid">
+          <div class="panel span-4"><h3>当前材料</h3><div class="result">收集：${items.length}条\n已复核纳入：${confirmed}条\n待复核：${pending}条\n平台：${escapeHtml([...new Set(items.map((item) => item.platform))].join("、") || "暂无")}</div></div>
+          <div class="panel span-8"><h3>伦理与偏差检查</h3><div class="check-list"><label class="check"><input type="checkbox" data-ethics-check>只使用公开内容，不含私信或私密群组</label><label class="check"><input type="checkbox" data-ethics-check>已经删除账号、联系方式和可识别信息</label><label class="check"><input type="checkbox" data-ethics-check>不会把网络样本频次解释为总体发生率</label><label class="check"><input type="checkbox" data-ethics-check>论文将说明平台推荐和自我选择偏差</label><label class="check"><input type="checkbox" data-ethics-check>AI编码已经过人工复核</label></div></div>
+          <div class="panel span-12"><h3>结果与研究局限</h3><textarea id="publicEthicsOutput" class="coach-output" readonly>${escapeHtml(workspace.publicEthics || "完成材料复核后，由AI生成可写入研究方法部分的数据来源说明、伦理处理和研究局限。")}</textarea><button class="btn primary" id="generatePublicEthicsBtn" type="button" ${items.length ? "" : "disabled"}>生成规范说明</button></div>
+        </div>`;
+    }
+
+    function wirePublicTopicStudy() {
+      document.querySelectorAll("[data-public-step]").forEach((button) => button.addEventListener("click", () => {
+        saveCollectionWorkspace({ publicStep: button.dataset.publicStep }, { localOnly: true });
+        setSubContent("collection", "public", publicTopicStudyHtml());
+      }));
+      document.getElementById("generatePublicPlanBtn")?.addEventListener("click", async () => {
+        const context = collectionResearchContext();
+        const output = document.getElementById("publicPlanOutput");
+        output.value = "正在生成网络话题研究方案...";
+        try {
+          const content = await callModel(`题目：${context.topic}\n请生成简洁可执行的网络公开话题研究方案，包括：研究目的、建议平台、时间范围、核心关键词、自然语言扩展词、纳入标准、排除标准、建议字段、初步编码框架、与判例/报告/访谈如何交叉验证、不能得出的结论。不得建议绕过登录、验证码或平台限制。控制在1000字以内。`);
+          output.value = content;
+          saveCollectionWorkspace({ publicPlan: content });
+        } catch (error) { output.value = `生成失败：${error.message}`; }
+      });
+      document.getElementById("copyPublicKeywordsBtn")?.addEventListener("click", async () => {
+        const text = collectionWorkspace().publicPlan || collectionResearchContext().topic || "";
+        await navigator.clipboard.writeText(text).catch(() => {});
+        const status = document.getElementById("publicCollectStatus");
+        if (status) status.textContent = "研究方案已复制，可据此在平台内组合检索关键词。";
+      });
+      document.getElementById("publicOcrBtn")?.addEventListener("click", async () => {
+        const file = document.getElementById("publicImage")?.files?.[0];
+        const status = document.getElementById("publicCollectStatus");
+        if (!file) { status.className = "notice warn"; status.textContent = "请先选择一张截图。"; return; }
+        try {
+          const text = await callVisionModel(file, "请按阅读顺序提取截图中的帖子正文和可见评论。删除头像描述、按钮文字和无关导航，不推测被遮挡内容。");
+          document.getElementById("publicText").value = text;
+          status.className = "notice ok";
+          status.textContent = "截图文字已识别，请核对并删除用户名等身份信息后保存。";
+        } catch (error) { status.className = "notice warn"; status.textContent = `${error.message}。可以直接复制文字或改用支持图片的模型。`; }
+      });
+      document.getElementById("savePublicItemBtn")?.addEventListener("click", () => {
+        const platform = document.getElementById("publicPlatform").value;
+        const url = document.getElementById("publicUrl").value.trim();
+        const text = document.getElementById("publicText").value.trim();
+        const status = document.getElementById("publicCollectStatus");
+        if (!text) { status.className = "notice warn"; status.textContent = "请粘贴正文、评论或先识别截图。"; return; }
+        const workspace = collectionWorkspace();
+        const anonymousText = anonymizePublicText(text);
+        const duplicate = workspace.publicItems.some((item) => (url && item.url === url) || simpleHash(item.anonymousText || "") === simpleHash(anonymousText));
+        if (duplicate) { status.className = "notice warn"; status.textContent = "这条公开内容可能已经导入，请勿重复保存。"; return; }
+        const item = { id: `public-${Date.now()}`, sourceNo: nextPublicSourceNo(platform, workspace.publicItems), platform, url, publishDate: document.getElementById("publicDate").value, collectedAt: new Date().toLocaleString(), text, anonymousText, imageName: document.getElementById("publicImage")?.files?.[0]?.name || "", reviewStatus: "pending" };
+        saveCollectionWorkspace({ publicItems: [item, ...workspace.publicItems] });
+        setSubContent("collection", "public", publicTopicStudyHtml());
+      });
+      document.querySelectorAll("[data-public-delete]").forEach((button) => button.addEventListener("click", () => {
+        const workspace = collectionWorkspace();
+        saveCollectionWorkspace({ publicItems: workspace.publicItems.filter((item) => item.id !== button.dataset.publicDelete) });
+        setSubContent("collection", "public", publicTopicStudyHtml());
+      }));
+      document.querySelectorAll("[data-public-review]").forEach((select) => select.addEventListener("change", () => {
+        const workspace = collectionWorkspace();
+        workspace.publicItems = workspace.publicItems.map((item) => item.id === select.dataset.publicReview ? { ...item, reviewStatus: select.value } : item);
+        saveCollectionWorkspace({ publicItems: workspace.publicItems });
+      }));
+      document.getElementById("generatePublicCodingBtn")?.addEventListener("click", async () => {
+        const workspace = collectionWorkspace();
+        const items = workspace.publicItems.filter((item) => item.reviewStatus !== "excluded").slice(0, 30);
+        const output = document.getElementById("publicCodingOutput");
+        output.textContent = "正在整理匿名文本并编码...";
+        try {
+          const corpus = items.map((item) => `${item.sourceNo}｜${item.platform}｜${(item.anonymousText || "").slice(0, 900)}`).join("\n\n");
+          const content = await callModel(`题目：${collectionResearchContext().topic}\n以下为已匿名化的网络公开文本：\n${corpus}\n\n请进行初步内容分析。先逐条按“编号：阶段；核心行为；实施主体；表面理由；伦理问题；员工反应；结果；证据强度；纳入建议”表达，再归纳5项以内的共同主题和需要人工核查之处。不得补造原文没有的信息，控制在1600字以内。`);
+          output.textContent = content;
+          saveCollectionWorkspace({ publicCoding: content });
+        } catch (error) { output.textContent = `编码失败：${error.message}`; }
+      });
+      document.getElementById("exportPublicDataBtn")?.addEventListener("click", exportPublicTopicCsv);
+      document.getElementById("generatePublicEthicsBtn")?.addEventListener("click", async () => {
+        const checks = [...document.querySelectorAll("[data-ethics-check]")];
+        const output = document.getElementById("publicEthicsOutput");
+        if (checks.some((item) => !item.checked)) { output.value = "请先逐项完成并勾选伦理与偏差检查。"; return; }
+        const workspace = collectionWorkspace();
+        try {
+          const content = await callModel(`题目：${collectionResearchContext().topic}\n网络材料共${workspace.publicItems.length}条，已复核纳入${workspace.publicItems.filter((i) => i.reviewStatus === "confirmed").length}条。\n初步编码：${workspace.publicCoding || "未提供"}\n请生成可供学生修改的数据来源与研究伦理说明，包含检索与筛选、匿名化、AI辅助和人工复核、平台推荐偏差、自我选择偏差、不能推断总体发生率、与其他证据交叉验证。控制在600字以内，并提醒只能参考。`);
+          output.value = content;
+          saveCollectionWorkspace({ publicEthics: content });
+        } catch (error) { output.value = `生成失败：${error.message}`; }
+      });
+    }
+
+    function csvCell(value) { return `"${String(value || "").replace(/"/g, '""')}"`; }
+
+    function exportPublicTopicCsv() {
+      const rows = [["来源编号", "平台", "发布日期", "公开链接", "匿名文本", "复核状态"]];
+      collectionWorkspace().publicItems.forEach((item) => rows.push([item.sourceNo, item.platform, item.publishDate, item.url, item.anonymousText, item.reviewStatus || "pending"]));
+      downloadTextFile("网络公开话题匿名资料.csv", rows.map((row) => row.map(csvCell).join(",")).join("\r\n"), "text/csv;charset=utf-8");
+    }
+
+    function collectionRecordsHtml() {
+      const workspace = collectionWorkspace();
+      const records = workspace.records || [];
+      return `
+        <h3>已获取数据</h3>
+        <div class="collection-split">
+          <div class="panel"><h3>登记一项资料</h3><div class="compact-form-grid"><div class="field"><label>资料类型</label><select id="recordType"><option>政府统计</option><option>行业报告</option><option>企业资料</option><option>问卷数据</option><option>访谈资料</option><option>案例文书</option><option>其他</option></select></div><div class="field"><label>获取日期</label><input id="recordDate" type="date"></div></div><div class="field"><label>资料名称</label><input id="recordName" type="text" placeholder="例如：2024年文化和旅游发展统计公报"></div><div class="field"><label>来源网址或说明</label><input id="recordSource" type="text" placeholder="网址、机构或文件来源"></div><div class="field"><label>用途</label><textarea id="recordUse" style="min-height:90px;" placeholder="这项资料准备支持论文的哪个问题或章节"></textarea></div><button class="btn primary" id="saveRecordBtn" type="button">保存登记</button><div id="recordStatus" class="notice" style="margin-top:10px;">这里只登记来源和用途，大型原始文件暂不写入浏览器。</div></div>
+          <div class="panel"><h3>资料清单（${records.length}项）</h3><div class="collection-list">${records.length ? records.map((item) => `<div class="collection-item"><div class="collection-item-head"><div><strong>${escapeHtml(item.name)}</strong><br><small>${escapeHtml(item.type)} · ${escapeHtml(item.date || item.createdAt)}</small></div><button class="btn danger" data-record-delete="${item.id}" type="button">删除</button></div><p>${escapeHtml(item.source || "")}</p><p>用途：${escapeHtml(item.use || "未填写")}</p></div>`).join("") : `<div class="notice" style="margin:10px;">尚未登记数据资料。</div>`}</div><button class="btn" id="exportRecordBtn" type="button" style="margin-top:10px;" ${records.length ? "" : "disabled"}>导出资料清单</button></div>
+        </div>`;
+    }
+
+    function wireCollectionRecords() {
+      document.getElementById("saveRecordBtn")?.addEventListener("click", () => {
+        const name = document.getElementById("recordName").value.trim();
+        const status = document.getElementById("recordStatus");
+        if (!name) { status.className = "notice warn"; status.textContent = "请填写资料名称。"; return; }
+        const workspace = collectionWorkspace();
+        const item = { id: `record-${Date.now()}`, name, type: document.getElementById("recordType").value, date: document.getElementById("recordDate").value, source: document.getElementById("recordSource").value.trim(), use: document.getElementById("recordUse").value.trim(), createdAt: new Date().toLocaleString() };
+        saveCollectionWorkspace({ records: [item, ...workspace.records] });
+        setSubContent("collection", "records", collectionRecordsHtml());
+      });
+      document.querySelectorAll("[data-record-delete]").forEach((button) => button.addEventListener("click", () => {
+        const workspace = collectionWorkspace();
+        saveCollectionWorkspace({ records: workspace.records.filter((item) => item.id !== button.dataset.recordDelete) });
+        setSubContent("collection", "records", collectionRecordsHtml());
+      }));
+      document.getElementById("exportRecordBtn")?.addEventListener("click", () => {
+        const rows = [["类型", "名称", "日期", "来源", "用途"], ...collectionWorkspace().records.map((item) => [item.type, item.name, item.date, item.source, item.use])];
+        downloadTextFile("论文数据来源清单.csv", rows.map((row) => row.map(csvCell).join(",")).join("\r\n"), "text/csv;charset=utf-8");
+      });
+    }
+
+    function collectionQualityHtml() {
+      const workspace = collectionWorkspace();
+      return `
+        <h3>数据质量检查</h3>
+        <div class="notice">检查的重点不是“数据越多越好”，而是每项结论是否有足够、适当且来源多样的证据。</div>
+        <div class="grid" style="margin-top:12px;"><div class="panel span-4"><h3>当前数据概况</h3><div class="result">登记资料：${workspace.records.length}项\n网络话题：${workspace.publicItems.length}条\n已复核网络材料：${workspace.publicItems.filter((item) => item.reviewStatus === "confirmed").length}条\n数据任务表：${workspace.taskMap ? "已生成" : "未生成"}\n网络编码：${workspace.publicCoding ? "已生成" : "未生成"}</div></div><div class="panel span-8"><h3>质量检查报告</h3><textarea id="collectionQualityOutput" class="coach-output" readonly>${escapeHtml(workspace.qualityReport || "AI将检查证据缺口、来源单一、样本偏差、字段不足、结论越界和交叉验证情况。")}</textarea></div></div>
+        <button class="btn primary" id="generateCollectionQualityBtn" type="button">AI检查数据是否够用</button>`;
+    }
+
+    function wireCollectionQuality() {
+      document.getElementById("generateCollectionQualityBtn")?.addEventListener("click", async () => {
+        const workspace = collectionWorkspace();
+        const output = document.getElementById("collectionQualityOutput");
+        output.value = "正在检查数据质量...";
+        try {
+          const recordText = workspace.records.map((item) => `${item.type}｜${item.name}｜${item.use}`).join("\n");
+          const content = await callModel(`题目：${collectionResearchContext().topic}\n数据任务：${workspace.taskMap || "未生成"}\n已登记资料：\n${recordText || "暂无"}\n网络公开材料：${workspace.publicItems.length}条，其中已复核${workspace.publicItems.filter((i) => i.reviewStatus === "confirmed").length}条。\n\n请按要点给出：1.目前能支持什么；2.仍缺哪些关键证据；3.研究对象或来源是否单一；4.幸存者偏差、自我选择偏差或平台偏差；5.哪些结论不能推出；6.下一步最优先补什么。控制在800字以内。`);
+          output.value = content;
+          saveCollectionWorkspace({ qualityReport: content });
+        } catch (error) { output.value = `检查失败：${error.message}`; }
+      });
     }
 
     function collectionSubmodules() {
