@@ -1648,7 +1648,9 @@
     }
 
     function isAppInstalledMode() {
-      return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true || localStorage.getItem("thesisPwaInstalled") === "true";
+      const standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+      if (!standalone) localStorage.removeItem("thesisPwaInstalled");
+      return standalone;
     }
 
     function updateInstallTips() {
@@ -1690,7 +1692,9 @@
 
     window.addEventListener("beforeinstallprompt", (event) => {
       event.preventDefault();
+      localStorage.removeItem("thesisPwaInstalled");
       deferredInstallPrompt = event;
+      if (currentLoginUser()?.verified) showInstallReminder();
     });
 
     window.addEventListener("appinstalled", () => {
