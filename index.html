@@ -499,14 +499,45 @@
       line-height: 1.72;
       white-space: pre-wrap;
     }
+    .web-search-bar {
+      display: grid;
+      grid-template-columns: minmax(170px, .8fr) minmax(280px, 1.6fr) repeat(2, minmax(145px, .7fr)) 100px;
+      gap: 9px;
+      align-items: end;
+      padding: 11px;
+      border: 1px solid var(--line);
+      border-top: 3px solid var(--teal);
+      border-radius: var(--radius);
+      background: #fff;
+      box-shadow: 0 9px 22px rgba(15,23,42,.065);
+    }
+    .web-search-bar .field { margin: 0; }
+    .web-search-results { display: grid; gap: 9px; margin-top: 10px; }
+    .web-result {
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--brand);
+      border-radius: var(--radius);
+      padding: 11px 12px;
+      background: #fff;
+      box-shadow: 0 7px 18px rgba(15,23,42,.055);
+    }
+    .web-result-head { display: flex; gap: 10px; justify-content: space-between; align-items: flex-start; }
+    .web-result-score { min-width: 54px; color: var(--teal); font-weight: 800; text-align: right; }
+    .web-result h4 { margin: 0 0 5px; line-height: 1.45; font-size: 15px; }
+    .web-result p { margin: 7px 0; color: #475569; line-height: 1.62; font-size: 13px; }
+    .web-result-reason { color: #315071; font-size: 12px; }
+    .web-result-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 8px; }
+    .manual-import-drawer { margin-top: 12px; }
     .compact-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .compact-form-grid .field { margin: 0; }
     .privacy-flag { color: #9a3412; font-weight: 700; }
     @media (max-width: 1000px) {
       .collection-split, .source-card-grid { grid-template-columns: 1fr; }
+      .web-search-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 700px) {
       .compact-form-grid { grid-template-columns: 1fr; }
+      .web-search-bar { grid-template-columns: 1fr; }
       .collection-subnav-shell .subnav { align-items: stretch; }
       .collection-subnav-shell .subnav h3 { width: 100%; }
       .collection-subnav-shell .sub-btn { flex: 1 1 42%; text-align: center; }
@@ -5950,30 +5981,129 @@ ${limitMethodContext(recent, 5000)}
       return publicEthicsHtml();
     }
 
+    const publicSearchTypeMeta = {
+      news: { label: "全网新闻", site: "", suffix: "新闻 报道 事件" },
+      reports: { label: "机构与研究报告", site: "", suffix: "调查报告 研究报告 白皮书" },
+      xhs: { label: "小红书", site: "xiaohongshu.com", suffix: "真实经历 经验" },
+      zhihu: { label: "知乎", site: "zhihu.com", suffix: "经历 讨论 回答" },
+      weibo: { label: "微博", site: "weibo.com", suffix: "话题 讨论" },
+      forum: { label: "公开论坛", site: "", suffix: "论坛 讨论 帖子" }
+    };
+
     function publicCollectHtml() {
-      const items = collectionWorkspace().publicItems || [];
+      const workspace = collectionWorkspace();
+      const items = workspace.publicItems || [];
+      const results = workspace.publicSearchResults || [];
       const topic = collectionResearchContext().topic;
-      const keyword = encodeURIComponent((topic || "三期女职工 隐性排挤").slice(0, 60));
+      const searchType = publicSearchTypeMeta[workspace.publicSearchType] ? workspace.publicSearchType : "news";
+      const endDate = workspace.publicSearchEnd || new Date().toISOString().slice(0, 10);
+      const startDate = workspace.publicSearchStart || new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
       return `
-        <div class="notice">按研究方案搜索并人工确认内容。静态网页不能直接读取其他平台页面，可粘贴公开内容，或用支持图片的模型识别截图。</div>
-        <div class="row" style="margin:10px 0;"><a class="btn" href="https://www.xiaohongshu.com/search_result?keyword=${keyword}" target="_blank" rel="noopener">打开小红书搜索</a><a class="btn" href="https://www.zhihu.com/search?type=content&q=${keyword}" target="_blank" rel="noopener">打开知乎搜索</a><button class="btn" id="copyPublicKeywordsBtn" type="button">复制检索方案</button></div>
-        <div class="collection-split">
-          <div class="panel">
-            <h3>导入一条公开内容</h3>
-            <div class="compact-form-grid"><div class="field"><label>平台</label><select id="publicPlatform"><option>小红书</option><option>知乎</option><option>微博</option><option>公开论坛</option><option>投诉平台</option><option>其他公开网页</option></select></div><div class="field"><label>发布日期</label><input id="publicDate" type="date"></div></div>
-            <div class="field"><label>公开链接</label><input id="publicUrl" type="url" placeholder="只填写公开可访问的来源链接"></div>
-            <div class="field"><label>正文或选定评论</label><textarea id="publicText" style="min-height:180px;" placeholder="粘贴与研究问题有关的公开内容，不要导入私信、用户名和联系方式。"></textarea></div>
-            <div class="field"><label>截图OCR（可选）</label><input id="publicImage" type="file" accept="image/*"><p class="hint">截图识别会把图片发送给你当前接入的模型。上传前请裁掉头像、账号和其他身份信息；不确定时请直接粘贴文字。</p></div>
-            <div class="row"><button class="btn" id="publicOcrBtn" type="button">AI识别截图</button><button class="btn primary" id="savePublicItemBtn" type="button">匿名化并保存</button></div>
-            <div id="publicCollectStatus" class="notice" style="margin-top:10px;">粘贴的原文只保存在当前设备；同步到COS和用于编码的是匿名文本。截图OCR需另行遵守上方提醒。</div>
+        <div class="notice">AI先根据题目优化检索词，腾讯云联网搜索返回公开结果，再由AI结合论文主题二次排序。搜索结果需要学生确认后才会进入研究资料。</div>
+        <div class="web-search-bar" style="margin-top:10px;">
+          <div class="field"><label>搜索来源</label><select id="publicSearchType">${Object.entries(publicSearchTypeMeta).map(([id, meta]) => `<option value="${id}" ${id === searchType ? "selected" : ""}>${meta.label}</option>`).join("")}</select></div>
+          <div class="field"><label>补充检索要求</label><input id="publicSearchExtra" type="text" value="${escapeHtml(workspace.publicSearchExtra || "")}" placeholder="可填写地区、群体、行为或需要排除的内容"></div>
+          <div class="field"><label>开始日期</label><input id="publicSearchStart" type="date" value="${startDate}"></div>
+          <div class="field"><label>结束日期</label><input id="publicSearchEnd" type="date" value="${endDate}"></div>
+          <div class="field"><label>结果数</label><select id="publicSearchCount"><option value="10" ${Number(workspace.publicSearchCount) !== 20 ? "selected" : ""}>10条</option><option value="20" ${Number(workspace.publicSearchCount) === 20 ? "selected" : ""}>20条</option></select></div>
+          <button class="btn primary" id="runPublicSearchBtn" type="button" ${topic ? "" : "disabled"}>AI开始搜索</button>
+        </div>
+        <div id="publicSearchStatus" class="notice ${results.length ? "ok" : ""}" style="margin-top:10px;">${results.length ? `已获得${results.length}条结果。实际检索词：${escapeHtml(workspace.publicSearchQuery || "")}${workspace.publicSearchCached ? "（命中缓存，未产生重复搜索）" : ""}` : topic ? `当前题目：${escapeHtml(topic)}` : "请先确认研究题目。"}</div>
+        <div class="web-search-results">${publicSearchResultsHtml(results)}</div>
+        <details class="drawer manual-import-drawer"><summary>搜索未覆盖时：手动导入文字、链接或截图</summary><div class="drawer-body">
+          <div class="collection-split">
+            <div class="panel">
+              <h3>手动导入一条公开内容</h3>
+              <div class="compact-form-grid"><div class="field"><label>平台</label><select id="publicPlatform"><option>小红书</option><option>知乎</option><option>微博</option><option>公开论坛</option><option>投诉平台</option><option>新闻网站</option><option>机构报告</option><option>其他公开网页</option></select></div><div class="field"><label>发布日期</label><input id="publicDate" type="date"></div></div>
+              <div class="field"><label>公开链接</label><input id="publicUrl" type="url" placeholder="只填写公开可访问的来源链接"></div>
+              <div class="field"><label>正文或选定评论</label><textarea id="publicText" style="min-height:180px;" placeholder="粘贴与研究问题有关的公开内容，不要导入私信、用户名和联系方式。"></textarea></div>
+              <div class="field"><label>截图OCR（可选）</label><input id="publicImage" type="file" accept="image/*"><p class="hint">截图识别会把图片发送给当前接入的模型。上传前请裁掉头像、账号和其他身份信息。</p></div>
+              <div class="row"><button class="btn" id="publicOcrBtn" type="button">AI识别截图</button><button class="btn primary" id="savePublicItemBtn" type="button">匿名化并保存</button><button class="btn" id="copyPublicKeywordsBtn" type="button">复制研究方案</button></div>
+              <div id="publicCollectStatus" class="notice" style="margin-top:10px;">粘贴的原文只保存在当前设备；同步到COS和用于编码的是匿名文本。</div>
+            </div>
+            <div class="panel"><h3>已收集 ${items.length} 条</h3><div class="collection-list">${publicItemListHtml(items)}</div></div>
           </div>
-          <div class="panel"><h3>已收集 ${items.length} 条</h3><div class="collection-list">${publicItemListHtml(items)}</div></div>
-        </div>`;
+        </div></details>`;
+    }
+
+    function publicSearchResultsHtml(results) {
+      if (!results.length) return "";
+      return results.map((result, index) => {
+        const score = Number.isFinite(Number(result.aiScore)) ? Number(result.aiScore) : Math.round(Number(result.score || 0) * 100);
+        return `<article class="web-result"><div class="web-result-head"><div><h4>${index + 1}. ${escapeHtml(result.title)}</h4><div class="source-meta"><span class="tag">${escapeHtml(result.site || "公开网页")}</span><span class="tag">${escapeHtml(result.date || "日期待确认")}</span><span class="tag">${escapeHtml(result.authority || "来源待核查")}</span></div></div><div class="web-result-score">${score || "--"}${score ? "分" : ""}</div></div><p>${escapeHtml((result.passage || "暂无摘要").slice(0, 420))}</p>${result.aiReason ? `<div class="web-result-reason">AI判断：${escapeHtml(result.aiReason)}</div>` : ""}<div class="web-result-actions"><a class="btn" href="${escapeHtml(result.url)}" target="_blank" rel="noopener">打开原文</a><button class="btn" data-import-search-summary="${escapeHtml(result.id)}" type="button">导入摘要</button><button class="btn primary" data-extract-search-article="${escapeHtml(result.id)}" type="button">尝试提取正文</button><button class="btn danger" data-remove-search-result="${escapeHtml(result.id)}" type="button">排除</button></div></article>`;
+      }).join("");
     }
 
     function publicItemListHtml(items) {
       if (!items.length) return `<div class="notice" style="margin:10px;">尚未收集公开话题。</div>`;
       return items.map((item) => `<article class="collection-item"><div class="collection-item-head"><div><strong>${escapeHtml(item.sourceNo)}</strong> <span class="tag">${escapeHtml(item.platform)}</span><br><small>${escapeHtml(item.publishDate || item.collectedAt || "")}</small></div><div class="row"><button class="btn danger" data-public-delete="${item.id}" type="button">删除</button></div></div><p>${escapeHtml((item.anonymousText || item.text || "").slice(0, 180))}${(item.anonymousText || item.text || "").length > 180 ? "…" : ""}</p></article>`).join("");
+    }
+
+    function publicSearchAuthority(result) {
+      const host = (() => { try { return new URL(result.url).hostname.toLowerCase(); } catch (error) { return ""; } })();
+      if (/\.gov\.cn$|court\.gov\.cn$|spp\.gov\.cn$|women\.org\.cn$/.test(host)) return "A级·官方来源";
+      if (/people\.com\.cn$|xinhuanet\.com$|央视|新华|人民网/.test(`${host}${result.site || ""}`)) return "B级·权威媒体";
+      if (/64365\.com$|lawtime\.cn$/.test(host)) return "C级·专业网站";
+      if (/xiaohongshu\.com$|zhihu\.com$|weibo\.com$/.test(host)) return "D级·网络叙事";
+      return "来源待核查";
+    }
+
+    function cleanModelJson(text) {
+      const source = String(text || "").trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+      const start = source.indexOf("[");
+      const end = source.lastIndexOf("]");
+      if (start < 0 || end <= start) return [];
+      try { return JSON.parse(source.slice(start, end + 1)); } catch (error) { return []; }
+    }
+
+    async function optimizePublicSearchQuery(topic, type, extra) {
+      const meta = publicSearchTypeMeta[type] || publicSearchTypeMeta.news;
+      const fallback = `${topic} ${meta.suffix} ${extra || ""}`.replace(/\s+/g, " ").trim().slice(0, 180);
+      try {
+        const content = await callModel(`论文题目：${topic}\n搜索来源：${meta.label}\n补充要求：${extra || "无"}\n请生成一条适合中文互联网搜索引擎的检索语句。必须覆盖题目核心对象、核心现象及常见自然语言表达；不要写解释，不要使用site:，只输出一行，控制在80个汉字以内。`);
+        return String(content || "").replace(/```/g, "").replace(/[\r\n]+/g, " ").replace(/^检索(?:词|式)[：:]?\s*/, "").trim().slice(0, 180) || fallback;
+      } catch (error) { return fallback; }
+    }
+
+    async function rankPublicSearchResults(topic, results) {
+      if (!results.length) return results;
+      const fallback = results.map((result) => ({ ...result, authority: publicSearchAuthority(result) }));
+      try {
+        const list = results.map((result, index) => `${index + 1}｜${result.title}｜${result.site}｜${(result.passage || "").slice(0, 260)}`).join("\n");
+        const content = await callModel(`论文题目：${topic}\n请评估以下搜索结果与论文题目的研究匹配度。优先考虑研究对象、核心现象、具体事实、来源权威性和可用于论文的证据价值；重复、泛泛普法或仅碰巧出现关键词的结果应降分。\n${list}\n\n只输出JSON数组，不要解释，格式为：[{"index":1,"score":88,"reason":"20字以内理由"}]。必须覆盖每个编号，score为0至100整数。`);
+        const rankings = cleanModelJson(content);
+        if (!rankings.length) return fallback;
+        return fallback.map((result, index) => {
+          const rank = rankings.find((item) => Number(item.index) === index + 1) || {};
+          return { ...result, aiScore: Math.max(0, Math.min(100, Number(rank.score) || 0)), aiReason: String(rank.reason || "").slice(0, 80) };
+        }).sort((a, b) => Number(b.aiScore || 0) - Number(a.aiScore || 0));
+      } catch (error) { return fallback; }
+    }
+
+    function addSearchMaterial(result, text, kind) {
+      const workspace = collectionWorkspace();
+      const anonymousText = anonymizePublicText(text);
+      const duplicate = workspace.publicItems.some((item) => item.url === result.url || simpleHash(item.anonymousText || "") === simpleHash(anonymousText));
+      if (duplicate) return { saved: false, message: "该结果已经导入。" };
+      const type = workspace.publicSearchType || "news";
+      const platform = publicSearchTypeMeta[type]?.label || result.site || "公开网页";
+      const item = {
+        id: `public-${Date.now()}`,
+        sourceNo: nextPublicSourceNo(platform, workspace.publicItems),
+        platform,
+        contentKind: kind,
+        title: result.title,
+        url: result.url,
+        publishDate: result.date || "",
+        collectedAt: new Date().toLocaleString(),
+        text,
+        anonymousText,
+        reviewStatus: "pending",
+        searchScore: result.aiScore || result.score || 0,
+        authority: result.authority || publicSearchAuthority(result)
+      };
+      saveCollectionWorkspace({ publicItems: [item, ...workspace.publicItems] });
+      return { saved: true, message: `${kind}已导入，等待人工复核。` };
     }
 
     function anonymizePublicText(text) {
@@ -6001,7 +6131,7 @@ ${limitMethodContext(recent, 5000)}
     }
 
     function nextPublicSourceNo(platform, items) {
-      const prefix = ({ 小红书: "XHS", 知乎: "ZH", 微博: "WB", 公开论坛: "FOR", 投诉平台: "COM" })[platform] || "WEB";
+      const prefix = ({ 小红书: "XHS", 知乎: "ZH", 微博: "WB", 公开论坛: "FOR", 投诉平台: "COM", 全网新闻: "NEWS", 机构与研究报告: "REP" })[platform] || "WEB";
       const next = Math.max(0, ...items.filter((item) => item.sourceNo?.startsWith(prefix)).map((item) => Number(String(item.sourceNo).slice(prefix.length)) || 0)) + 1;
       return `${prefix}${String(next).padStart(3, "0")}`;
     }
@@ -6045,6 +6175,74 @@ ${limitMethodContext(recent, 5000)}
           saveCollectionWorkspace({ publicPlan: content });
         } catch (error) { output.value = `生成失败：${error.message}`; }
       });
+      document.getElementById("runPublicSearchBtn")?.addEventListener("click", async () => {
+        const status = document.getElementById("publicSearchStatus");
+        const topic = collectionResearchContext().topic;
+        const type = document.getElementById("publicSearchType").value;
+        const extra = document.getElementById("publicSearchExtra").value.trim();
+        const start = document.getElementById("publicSearchStart").value;
+        const end = document.getElementById("publicSearchEnd").value;
+        const count = Number(document.getElementById("publicSearchCount").value || 10);
+        if (!topic) { status.className = "notice warn"; status.textContent = "请先确认研究题目。"; return; }
+        if (start && end && start > end) { status.className = "notice warn"; status.textContent = "开始日期不能晚于结束日期。"; return; }
+        status.className = "notice";
+        status.textContent = "AI正在生成检索式...";
+        try {
+          const query = await optimizePublicSearchQuery(topic, type, extra);
+          status.textContent = `正在搜索：${query}`;
+          beginAiWait("正在调用腾讯云联网搜索");
+          let search;
+          try {
+            search = await callCloudFunction("searchWeb", {
+              query,
+              site: publicSearchTypeMeta[type]?.site || "",
+              fromTime: start ? Math.floor(new Date(`${start}T00:00:00`).getTime() / 1000) : 0,
+              toTime: end ? Math.floor(new Date(`${end}T23:59:59`).getTime() / 1000) : 0,
+              count
+            });
+          } finally { endAiWait(); }
+          status.textContent = `已找到${search.results?.length || 0}条结果，AI正在判断研究匹配度...`;
+          const ranked = await rankPublicSearchResults(topic, search.results || []);
+          saveCollectionWorkspace({ publicSearchType: type, publicSearchExtra: extra, publicSearchStart: start, publicSearchEnd: end, publicSearchCount: count, publicSearchQuery: query, publicSearchResults: ranked, publicSearchCached: !!search.cached, publicSearchRequestId: search.requestId || "" });
+          setSubContent("collection", "public", publicTopicStudyHtml());
+        } catch (error) {
+          status.className = "notice warn";
+          status.textContent = `搜索失败：${error.message}`;
+        }
+      });
+      document.querySelectorAll("[data-import-search-summary]").forEach((button) => button.addEventListener("click", () => {
+        const workspace = collectionWorkspace();
+        const result = (workspace.publicSearchResults || []).find((item) => item.id === button.dataset.importSearchSummary);
+        if (!result) return;
+        const outcome = addSearchMaterial(result, result.passage || result.title, "搜索摘要");
+        const status = document.getElementById("publicSearchStatus");
+        status.className = outcome.saved ? "notice ok" : "notice warn";
+        status.textContent = outcome.message;
+      }));
+      document.querySelectorAll("[data-extract-search-article]").forEach((button) => button.addEventListener("click", async () => {
+        const workspace = collectionWorkspace();
+        const result = (workspace.publicSearchResults || []).find((item) => item.id === button.dataset.extractSearchArticle);
+        const status = document.getElementById("publicSearchStatus");
+        if (!result) return;
+        status.className = "notice";
+        status.textContent = "正在读取公开网页正文...";
+        beginAiWait("正在提取公开网页正文");
+        try {
+          const article = await callCloudFunction("extractPublicArticle", { url: result.url });
+          const enriched = { ...result, title: article.title || result.title, date: article.date || result.date, url: article.finalUrl || result.url };
+          const outcome = addSearchMaterial(enriched, article.text, "网页正文");
+          status.className = outcome.saved ? "notice ok" : "notice warn";
+          status.textContent = outcome.message;
+        } catch (error) {
+          status.className = "notice warn";
+          status.textContent = `正文提取失败：${error.message}。请打开原文后使用手动导入。`;
+        } finally { endAiWait(); }
+      }));
+      document.querySelectorAll("[data-remove-search-result]").forEach((button) => button.addEventListener("click", () => {
+        const workspace = collectionWorkspace();
+        saveCollectionWorkspace({ publicSearchResults: (workspace.publicSearchResults || []).filter((item) => item.id !== button.dataset.removeSearchResult) });
+        setSubContent("collection", "public", publicTopicStudyHtml());
+      }));
       document.getElementById("copyPublicKeywordsBtn")?.addEventListener("click", async () => {
         const text = collectionWorkspace().publicPlan || collectionResearchContext().topic || "";
         await navigator.clipboard.writeText(text).catch(() => {});

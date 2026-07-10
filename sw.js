@@ -1,4 +1,4 @@
-const CACHE_NAME = "thesis-ai-assistant-v7";
+const CACHE_NAME = "thesis-ai-assistant-v8";
 const CORE_ASSETS = [
   "./",
   "./index.html",
