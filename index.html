@@ -379,12 +379,14 @@
       align-items: start;
     }
 
-    .literature-subnav-shell {
+    .literature-subnav-shell,
+    .method-subnav-shell {
       grid-template-columns: minmax(0, 1fr);
       gap: 10px;
     }
 
-    .literature-subnav-shell .subnav {
+    .literature-subnav-shell .subnav,
+    .method-subnav-shell .subnav {
       position: static;
       display: flex;
       align-items: center;
@@ -393,24 +395,50 @@
       padding: 9px;
     }
 
-    .literature-subnav-shell .subnav h3 {
+    .literature-subnav-shell .subnav h3,
+    .method-subnav-shell .subnav h3 {
       margin: 0 8px 0 4px;
       flex: 0 0 auto;
     }
 
-    .literature-subnav-shell .sub-btn {
+    .literature-subnav-shell .sub-btn,
+    .method-subnav-shell .sub-btn {
       width: auto;
       margin: 0;
       padding: 8px 12px;
       min-height: 36px;
     }
 
-    .literature-subnav-shell .sub-btn.active {
+    .literature-subnav-shell .sub-btn.active,
+    .method-subnav-shell .sub-btn.active {
       box-shadow: inset 0 -3px 0 var(--brand);
     }
 
-    .literature-subnav-shell .work-area {
+    .literature-subnav-shell .work-area,
+    .method-subnav-shell .work-area {
       min-height: 620px;
+    }
+
+    .method-preview-content {
+      margin: 0;
+      padding: 18px;
+      min-height: 100%;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font: 15px/1.75 "Microsoft YaHei", sans-serif;
+      color: var(--text);
+      background: #fff;
+    }
+
+    .method-tool-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    @media (max-width: 900px) {
+      .method-tool-grid { grid-template-columns: 1fr; }
     }
 
     .subnav {
@@ -740,6 +768,7 @@
       gap: 10px;
       cursor: move;
       user-select: none;
+      touch-action: none;
     }
 
     .floating-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1606,6 +1635,8 @@
       else {
         activateModule("home");
         hydrateTopicDiagnosisHistory();
+        hydrateOutlineRecords();
+        hydrateMethodWorkspace();
       }
       setTimeout(showInstallReminder, 600);
     }
@@ -1800,7 +1831,7 @@
       renderModel();
       renderLiteratureAssistant();
       renderOutlineAssistant();
-      renderStudentAssistant("method", methodSubmodules());
+      renderMethodAssistant();
       renderStudentAssistant("collection", collectionSubmodules());
       renderStudentAssistant("analysis", analysisSubmodules());
       renderTopicAssistant();
@@ -2084,6 +2115,11 @@
       if (moduleId === "literature" && subId === "review") wireLiteratureReview();
       if (moduleId === "outline" && subId === "topic") wireOutlineTopic();
       if (moduleId === "outline" && subId === "generate") wireOutlineGenerate();
+      if (moduleId === "method" && subId === "context") wireMethodContext();
+      if (moduleId === "method" && subId === "advice") wireMethodAdvice();
+      if (moduleId === "method" && subId === "sampling") wireMethodSampling();
+      if (moduleId === "method" && subId === "tools") wireMethodTools();
+      if (moduleId === "method" && subId === "confirm") wireMethodConfirm();
     }
 
     function topicLearnHtml() {
@@ -3727,28 +3763,51 @@ ${hasMediator ? "中介作用：说明X先影响M，再由M影响Y。需要解�
     }
 
     function literatureTopicHtml() {
-      const history = topicDiagnosisHistory();
-      const selected = selectedLiteratureTopic();
+      const history = topicDiagnosisHistory().filter((item) => item.title && item.diagnosis);
+      const storedSelected = selectedLiteratureTopic();
+      const selectedRecord = history.find((item) => normalizeTopicTitle(item.title) === normalizeTopicTitle(storedSelected));
+      const selected = selectedRecord?.title || "";
+      if (storedSelected && !selected) setUserStorage("selectedLiteratureTopic", "");
       return `
         <h3>题目选择</h3>
-        <p class="hint">文献检索、导入、拆解和匹配测试都会围绕这里选定的题目展开。</p>
-        <details class="drawer" open>
-          <summary>查看历史题目诊断</summary>
-          <div class="drawer-body">
-            <div class="row">${history.map((item) => `<button class="btn" data-literature-topic="${escapeHtml(item.title)}">${escapeHtml(item.title)}</button>`).join("") || `<span class="hint">暂无历史题目，请先到“形成候选题目”生成诊断。</span>`}</div>
-          </div>
-        </details>
-        <div id="literatureTopicCurrent" class="notice" style="margin-top:14px;">${selected ? `同学，你当前选择的题目是：${escapeHtml(selected)}` : "尚未选择题目。"}</div>`;
+        <p class="hint">这里只列出你在“选题助手”中手动输入并完成题目诊断的题目。文献检索、导入、匹配测试和文献综述都会围绕选定题目展开。</p>
+        <div class="field">
+          <label for="literatureTopicSelect">从历史题目诊断中选择</label>
+          <select id="literatureTopicSelect" ${history.length ? "" : "disabled"}>
+            <option value="">${history.length ? "请选择论文题目" : "暂无已完成题目诊断的题目"}</option>
+            ${history.map((item) => `<option value="${escapeHtml(item.title)}" ${normalizeTopicTitle(item.title) === normalizeTopicTitle(selected) ? "selected" : ""}>${escapeHtml(item.title)}｜${literatureTopicStatus(item)}</option>`).join("")}
+          </select>
+        </div>
+        <div id="literatureTopicCurrent" class="notice ${selected ? "ok" : ""}" style="margin-top:14px;">${selected ? literatureSelectedTopicNotice(selectedRecord) : "尚未选择题目。"}</div>`;
+    }
+
+    function literatureTopicStatus(item) {
+      const completed = [item.diagnosis ? "题目诊断" : "", item.basic ? "写作建议" : "", item.improve ? "提升途径" : ""].filter(Boolean);
+      return completed.join("、") + "已完成";
+    }
+
+    function literatureSelectedTopicNotice(item) {
+      if (!item) return "尚未选择题目。";
+      const inherited = ["题目诊断", item.basic ? "写作建议" : "", item.improve ? "论文质量提升途径" : ""].filter(Boolean).join("、");
+      return `同学，你当前选择的题目是：${escapeHtml(item.title)}\n已继承：${inherited}。后续文献关键词、匹配测试和文献综述都将围绕这个题目展开。`;
     }
 
     function wireLiteratureTopic() {
-      document.querySelectorAll("[data-literature-topic]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const title = btn.dataset.literatureTopic;
-          setUserStorage("selectedLiteratureTopic", title);
-          saveProject({ topic: title });
-          document.getElementById("literatureTopicCurrent").textContent = `同学，你当前选择的题目是：${title}`;
-        });
+      const select = document.getElementById("literatureTopicSelect");
+      if (!select) return;
+      select.addEventListener("change", () => {
+        const title = select.value;
+        setUserStorage("selectedLiteratureTopic", title);
+        const current = document.getElementById("literatureTopicCurrent");
+        const item = topicDiagnosisHistory().find((record) => normalizeTopicTitle(record.title) === normalizeTopicTitle(title));
+        if (!title || !item?.diagnosis) {
+          current.className = "notice";
+          current.textContent = "尚未选择题目。";
+          return;
+        }
+        saveProject({ topic: title });
+        current.className = "notice ok";
+        current.textContent = `同学，你当前选择的题目是：${title}\n已继承：${["题目诊断", item.basic ? "写作建议" : "", item.improve ? "论文质量提升途径" : ""].filter(Boolean).join("、")}。后续文献关键词、匹配测试和文献综述都将围绕这个题目展开。`;
       });
     }
 
@@ -3758,7 +3817,11 @@ ${hasMediator ? "中介作用：说明X先影响M，再由M影响Y。需要解�
         <h3>文献收集建议</h3>
         <div class="notice">${topic ? `当前题目：${escapeHtml(topic)}` : "请先在“题目选择”中选择一个题目。"}</div>
         <div class="row" style="margin:12px 0;"><button class="btn primary" id="literatureAdviceBtn">生成文献收集建议</button></div>
-        <textarea id="literatureAdviceOutput" class="coach-output" readonly>${escapeHtml(getUserStorage("literatureAdvice", "等待生成。") || "等待生成。")}</textarea>`;
+        <textarea id="literatureAdviceOutput" class="coach-output" readonly>${escapeHtml(getUserStorage(literatureAdviceStorageKey(topic), "等待生成。") || "等待生成。")}</textarea>`;
+    }
+
+    function literatureAdviceStorageKey(topic) {
+      return `literatureAdvice_${simpleHash(normalizeTopicTitle(topic || "none"))}`;
     }
 
     function wireLiteratureAdvice() {
@@ -3773,7 +3836,7 @@ ${hasMediator ? "中介作用：说明X先影响M，再由M影响Y。需要解�
         try {
           const content = await callModel(literatureAdvicePrompt(topic), "你是本科论文文献检索指导教师。请输出结构清晰、可执行的中文建议。");
           box.value = content;
-          setUserStorage("literatureAdvice", content);
+          setUserStorage(literatureAdviceStorageKey(topic), content);
           syncCloud("saveLiteratureAdvice", { topic, content });
         } catch (error) {
           box.value = "生成失败：" + error.message;
@@ -3782,7 +3845,14 @@ ${hasMediator ? "中介作用：说明X先影响M，再由M影响Y。需要解�
     }
 
     function literatureAdvicePrompt(topic) {
-      return `请围绕本科论文题目给出文献收集建议。题目：${topic}
+      const record = topicDiagnosisHistory().find((item) => normalizeTopicTitle(item.title) === normalizeTopicTitle(topic)) || {};
+      return `请围绕本科论文题目给出文献收集建议。
+题目：${topic}
+题目诊断：${record.diagnosis || "未提供"}
+写作建议：${record.basic || "未提供"}
+论文质量提升途径：${record.improve || "未提供"}
+
+必须继承以上内容已经确定的研究对象、研究边界、核心变量或问题，不得重新扩大题目范围。
 请严格按以下格式输出：
 1. 文献关键词：按与题目相关程度排序，分为高度相关、中度相关、拓展关键词。
 2. 文献级别建议：说明重点获取哪种级别或层次的论文，不要过高也不要过低，适合本科生。
@@ -4372,12 +4442,14 @@ ${docs.map((doc, index) => `文献${index + 1}
           if (cached) {
             box.value = cached;
             setUserStorage(outlineDraftKey(level), cached);
+            rememberGeneratedOutline(topic, diagnosis, level, cached);
             saveProject({ topic, outline: cached, stage: "提纲已生成", progress: Math.max(project.progress || 0, 45) });
             return;
           }
           const content = await callModel(outlinePrompt(topic, diagnosis, level), "你是本科毕业论文提纲指导教师。请用中文输出结构清晰、符合本科论文规范的提纲。");
           box.value = content;
           setUserStorage(outlineDraftKey(level), content);
+          rememberGeneratedOutline(topic, diagnosis, level, content);
           saveOutlineFirst(topic, diagnosis, level, content);
           saveProject({ topic, outline: content, stage: "提纲已生成", progress: Math.max(project.progress || 0, 45) });
         } catch (error) {
@@ -4423,7 +4495,54 @@ ${docs.map((doc, index) => `文献${index + 1}
     function outlineDraftKey(level) {
       const topic = selectedOutlineTopic();
       const diagnosis = selectedOutlineDiagnosis();
+      return outlineDraftKeyFor(topic || "none", diagnosis || {}, level);
+    }
+
+    function outlineDraftKeyFor(topic, diagnosis, level) {
       return `outlineDraft_${outlineSourceId(topic || "none", diagnosis || {}, level)}`;
+    }
+
+    function generatedOutlineRecords() {
+      try {
+        return JSON.parse(getUserStorage("generatedOutlineRecords", "[]") || "[]");
+      } catch (error) {
+        return [];
+      }
+    }
+
+    function rememberGeneratedOutline(topic, diagnosis, level, content) {
+      const records = generatedOutlineRecords();
+      const sourceId = outlineSourceId(topic, diagnosis, level);
+      const existing = records.find((item) => item.sourceId === sourceId);
+      const record = {
+        id: sourceId,
+        sourceId,
+        topic,
+        level,
+        content,
+        updatedAt: new Date().toLocaleString()
+      };
+      if (existing) Object.assign(existing, record);
+      else records.unshift(record);
+      setUserStorage("generatedOutlineRecords", JSON.stringify(records.slice(0, 40)));
+      syncCloud("saveOutlineRecords", { records: records.slice(0, 40) });
+    }
+
+    async function hydrateOutlineRecords() {
+      const currentUser = currentLoginUser();
+      if (currentUser.role !== "student") return;
+      try {
+        const cloud = await callCloudFunction("getOutlineRecords", {});
+        const cloudRecords = cloud?.payload?.records || cloud?.records || [];
+        const merged = [...generatedOutlineRecords()];
+        cloudRecords.forEach((record) => {
+          if (!merged.some((item) => item.sourceId === record.sourceId)) merged.push(record);
+        });
+        setUserStorage("generatedOutlineRecords", JSON.stringify(merged.slice(0, 40)));
+        if (document.getElementById("method")) renderMethodAssistant();
+      } catch (error) {
+        console.warn("outline records sync failed", error);
+      }
     }
 
     function outlinePrompt(topic, diagnosis, level) {
@@ -4469,6 +4588,494 @@ ${diagnosis.diagnosis || "未提供；不得自行扩大题目研究对象和结
         { id: "generate", label: "生成提纲", what: "根据前面信息生成初稿。", why: "让学生知道论文各章分别解决什么问题。", how: "AI 生成后学生解释，教师审核。", pitfalls: "直接照搬模板。", output: "建议提纲。" },
         { id: "revise", label: "修改提纲", what: "对已有提纲做结构诊断。", why: "保证结构支撑研究结果。", how: "检查缺章、重章、顺序和逻辑。", pitfalls: "只有标题，没有每章任务。", output: "修改版提纲和修改理由。" }
       ];
+    }
+
+    function renderMethodAssistant() {
+      document.getElementById("method").innerHTML = shellWithSubnav("method", "研究方法助手", [
+        ["context", "题目与提纲"],
+        ["advice", "研究方法建议"],
+        ["sampling", "研究对象与抽样"],
+        ["tools", "研究工具"],
+        ["confirm", "方法方案确认"]
+      ]) + `
+        <div id="methodToolPreview" class="lit-preview">
+          <div class="floating-head" id="methodToolPreviewHead">
+            <strong id="methodToolPreviewTitle">研究工具预览</strong>
+            <div class="row">
+              <button class="floating-close" id="methodToolPreviewDownload" type="button">下载</button>
+              <button class="floating-close" id="methodToolPreviewFull" type="button">全屏</button>
+              <button class="floating-close" id="methodToolPreviewClose" type="button">关闭</button>
+            </div>
+          </div>
+          <div class="floating-body"><pre id="methodToolPreviewContent" class="method-preview-content"></pre></div>
+        </div>`;
+      setSubContent("method", "context", methodContextHtml());
+      bindSubnav("method", {
+        context: () => methodContextHtml(),
+        advice: () => methodAdviceHtml(),
+        sampling: () => methodSamplingHtml(),
+        tools: () => methodToolsHtml(),
+        confirm: () => methodConfirmHtml()
+      });
+      wireMethodToolPreview();
+    }
+
+    function methodWorkspace() {
+      try {
+        return JSON.parse(getUserStorage("methodWorkspace", "{}") || "{}");
+      } catch (error) {
+        return {};
+      }
+    }
+
+    function saveMethodWorkspace(patch = {}) {
+      const workspace = { ...methodWorkspace(), ...patch };
+      setUserStorage("methodWorkspace", JSON.stringify(workspace));
+      syncCloud("saveMethodWorkspace", workspace);
+      return workspace;
+    }
+
+    async function hydrateMethodWorkspace() {
+      const currentUser = currentLoginUser();
+      if (currentUser.role !== "student") return;
+      try {
+        const cloud = await callCloudFunction("getMethodWorkspace", {});
+        const cloudWorkspace = cloud?.payload || cloud || {};
+        const local = methodWorkspace();
+        const merged = {
+          ...cloudWorkspace,
+          ...local,
+          confirmed: { ...(cloudWorkspace.confirmed || {}), ...(local.confirmed || {}) },
+          outputs: { ...(cloudWorkspace.outputs || {}), ...(local.outputs || {}) },
+          finals: { ...(cloudWorkspace.finals || {}), ...(local.finals || {}) }
+        };
+        setUserStorage("methodWorkspace", JSON.stringify(merged));
+        if (document.getElementById("method")) renderMethodAssistant();
+      } catch (error) {
+        console.warn("method workspace sync failed", error);
+      }
+    }
+
+    function availableMethodOutlines() {
+      const records = [...generatedOutlineRecords()];
+      topicDiagnosisHistory().forEach((diagnosis) => {
+        ["basic", "excellent"].forEach((level) => {
+          const content = getUserStorage(outlineDraftKeyFor(diagnosis.title, diagnosis, level), "");
+          if (!content) return;
+          const sourceId = outlineSourceId(diagnosis.title, diagnosis, level);
+          if (!records.some((item) => item.sourceId === sourceId)) {
+            records.push({ id: sourceId, sourceId, topic: diagnosis.title, level, content, updatedAt: "历史记录" });
+          }
+        });
+      });
+      return records.filter((item) => item.topic && item.content);
+    }
+
+    function methodTopicKey(topic) {
+      return simpleHash(normalizeTopicTitle(topic || "none"));
+    }
+
+    function selectedMethodOutline() {
+      const workspace = methodWorkspace();
+      const records = availableMethodOutlines();
+      return records.find((item) => item.sourceId === workspace.selectedOutlineId) || records.find((item) => item.topic === workspace.selectedTopic) || null;
+    }
+
+    function currentConfirmedMethodContext() {
+      const workspace = methodWorkspace();
+      const topic = workspace.selectedTopic || "";
+      return workspace.confirmed?.[methodTopicKey(topic)] || null;
+    }
+
+    function methodContextHtml() {
+      const workspace = methodWorkspace();
+      const records = availableMethodOutlines();
+      const topics = [...new Set(records.map((item) => item.topic))];
+      const selectedTopic = topics.includes(workspace.selectedTopic) ? workspace.selectedTopic : "";
+      const versions = records.filter((item) => item.topic === selectedTopic);
+      const selectedRecord = versions.find((item) => item.sourceId === workspace.selectedOutlineId) || versions[0] || null;
+      const confirmed = workspace.confirmed?.[methodTopicKey(selectedTopic)] || null;
+      const displayedOutline = confirmed?.outlineSourceId === selectedRecord?.sourceId ? confirmed.outline : selectedRecord?.content || "";
+      const displayedSource = confirmed?.outlineSourceId === selectedRecord?.sourceId ? confirmed.source : "AI参考提纲";
+      return `
+        <h3>选择题目并确认当前研究提纲</h3>
+        <p class="hint">这里只列出已经生成过参考提纲的题目。AI参考提纲必须经过确认；如果指导教师修改过，请粘贴修改后的版本再确认。</p>
+        <div class="grid">
+          <div class="panel span-6">
+            <div class="field"><label>已经生成提纲的题目</label>
+              <select id="methodTopicSelect" ${topics.length ? "" : "disabled"}>
+                <option value="">${topics.length ? "请选择题目" : "暂无已生成提纲的题目"}</option>
+                ${topics.map((topic) => `<option value="${escapeHtml(topic)}" ${topic === selectedTopic ? "selected" : ""}>${escapeHtml(topic)}</option>`).join("")}
+              </select>
+            </div>
+          </div>
+          <div class="panel span-6">
+            <div class="field"><label>参考提纲版本</label>
+              <select id="methodOutlineVersion" ${versions.length ? "" : "disabled"}>
+                <option value="">${versions.length ? "请选择提纲版本" : "请先选择题目"}</option>
+                ${versions.map((item) => `<option value="${item.sourceId}" ${item.sourceId === selectedRecord?.sourceId ? "selected" : ""}>${item.level === "excellent" ? "90分左右参考提纲" : "80分左右参考提纲"} · ${escapeHtml(item.updatedAt || "")}</option>`).join("")}
+              </select>
+            </div>
+          </div>
+          <div class="panel span-12">
+            <div class="field"><label>当前准备采用的提纲（可直接修改）</label><textarea id="methodOutlineText" class="coach-output" style="min-height:360px;">${escapeHtml(displayedOutline)}</textarea></div>
+            <div class="row">
+              <div class="field" style="min-width:240px; margin:0;"><label>提纲来源</label><select id="methodOutlineSource"><option value="AI参考提纲" ${displayedSource === "AI参考提纲" ? "selected" : ""}>AI参考提纲</option><option value="学生修改" ${displayedSource === "学生修改" ? "selected" : ""}>学生修改</option><option value="教师修改" ${displayedSource === "教师修改" ? "selected" : ""}>教师修改</option></select></div>
+              <button class="btn primary" id="confirmMethodOutlineBtn" type="button">确认作为当前研究提纲</button>
+            </div>
+            <div id="methodOutlineStatus" class="notice ${confirmed ? "ok" : "warn"}" style="margin-top:12px;">${confirmed ? `已确认：${escapeHtml(confirmed.source)}，版本 ${escapeHtml(confirmed.versionLabel)}。后续方法建议以此版本为准。` : "尚未确认提纲，后续研究方法功能暂不可用。"}</div>
+          </div>
+        </div>`;
+    }
+
+    function wireMethodContext() {
+      const topicSelect = document.getElementById("methodTopicSelect");
+      const versionSelect = document.getElementById("methodOutlineVersion");
+      topicSelect?.addEventListener("change", () => {
+        const topic = topicSelect.value;
+        const first = availableMethodOutlines().find((item) => item.topic === topic);
+        saveMethodWorkspace({ selectedTopic: topic, selectedOutlineId: first?.sourceId || "" });
+        setSubContent("method", "context", methodContextHtml());
+      });
+      versionSelect?.addEventListener("change", () => {
+        saveMethodWorkspace({ selectedOutlineId: versionSelect.value });
+        setSubContent("method", "context", methodContextHtml());
+      });
+      document.getElementById("confirmMethodOutlineBtn")?.addEventListener("click", () => {
+        const workspace = methodWorkspace();
+        const outlineRecord = selectedMethodOutline();
+        const outline = document.getElementById("methodOutlineText").value.trim();
+        const source = document.getElementById("methodOutlineSource").value;
+        const status = document.getElementById("methodOutlineStatus");
+        if (!workspace.selectedTopic || !outlineRecord || !outline) {
+          status.className = "notice warn";
+          status.textContent = "请先选择题目和参考提纲，并确认提纲内容不为空。";
+          return;
+        }
+        const confirmed = { ...(workspace.confirmed || {}) };
+        const now = new Date();
+        confirmed[methodTopicKey(workspace.selectedTopic)] = {
+          topic: workspace.selectedTopic,
+          outline,
+          source,
+          level: outlineRecord.level,
+          outlineSourceId: outlineRecord.sourceId,
+          version: String(Date.now()),
+          versionLabel: now.toLocaleString(),
+          confirmedAt: now.toISOString()
+        };
+        saveMethodWorkspace({ confirmed });
+        saveProject({ topic: workspace.selectedTopic, outline, stage: "研究提纲已确认", progress: Math.max(project.progress || 0, 48) });
+        status.className = "notice ok";
+        status.textContent = `提纲已确认，来源：${source}。后续研究方法建议将以这个版本为准。`;
+      });
+    }
+
+    function methodSourceId(kind) {
+      const context = currentConfirmedMethodContext();
+      if (!context) return "";
+      const diagnosis = topicDiagnosisHistory().find((item) => normalizeTopicTitle(item.title) === normalizeTopicTitle(context.topic)) || {};
+      const source = ["method-v1", kind, context.topic, context.outline, context.level, diagnosis.diagnosis || "", diagnosis.basic || "", context.level === "excellent" ? diagnosis.improve || "" : ""].join("|");
+      return `method-v1-${kind}-${simpleHash(source)}`;
+    }
+
+    function methodOutput(kind) {
+      const cacheId = methodSourceId(kind);
+      return cacheId ? methodWorkspace().outputs?.[cacheId] || "" : "";
+    }
+
+    async function generateMethodOutput(kind, prompt, box) {
+      const context = currentConfirmedMethodContext();
+      if (!context) {
+        box.value = "请先在“题目与提纲”中确认当前研究提纲。";
+        return "";
+      }
+      const cacheId = methodSourceId(kind);
+      const local = methodOutput(kind);
+      if (local) {
+        box.value = local;
+        return local;
+      }
+      box.value = "正在检查是否已有该提纲版本的建议...";
+      try {
+        const cached = await callCloudFunction("getMethodOutput", { cacheId });
+        const cachedContent = cached?.content || cached?.payload?.content || "";
+        if (cachedContent) {
+          saveMethodOutputLocal(cacheId, cachedContent);
+          box.value = cachedContent;
+          return cachedContent;
+        }
+      } catch (error) {
+        // First generation has no cloud cache yet.
+      }
+      box.value = "正在根据已确认提纲生成...";
+      let content = "";
+      try {
+        content = await callModel(prompt, "你是本科毕业论文研究方法指导教师。建议必须可执行，并与题目、前置写作建议和已确认提纲保持一致。");
+      } catch (error) {
+        content = methodOutputFallback(kind, context, error.message);
+      }
+      saveMethodOutputLocal(cacheId, content);
+      syncCloud("saveMethodOutputFirst", { cacheId, kind, topic: context.topic, outlineVersion: context.version, content });
+      box.value = content;
+      return content;
+    }
+
+    function saveMethodOutputLocal(cacheId, content) {
+      const workspace = methodWorkspace();
+      const outputs = { ...(workspace.outputs || {}), [cacheId]: content };
+      saveMethodWorkspace({ outputs });
+    }
+
+    function methodInheritedContext() {
+      const context = currentConfirmedMethodContext();
+      if (!context) return null;
+      const diagnosis = topicDiagnosisHistory().find((item) => normalizeTopicTitle(item.title) === normalizeTopicTitle(context.topic)) || {};
+      return { context, diagnosis };
+    }
+
+    function methodAdviceHtml() {
+      const context = currentConfirmedMethodContext();
+      const output = methodOutput("advice");
+      return `
+        <h3>研究方法建议</h3>
+        <div class="notice ${context ? "ok" : "warn"}">${context ? `当前依据：${escapeHtml(context.topic)} · ${escapeHtml(context.source)} · ${context.level === "excellent" ? "90分左右" : "80分左右"}提纲` : "请先确认当前研究提纲。"}</div>
+        <div class="row" style="margin:12px 0;"><button class="btn primary" id="generateMethodAdviceBtn" type="button">生成研究方法建议</button></div>
+        <textarea id="methodAdviceOutput" class="coach-output" readonly>${escapeHtml(output || "等待生成。")}</textarea>`;
+    }
+
+    function wireMethodAdvice() {
+      document.getElementById("generateMethodAdviceBtn")?.addEventListener("click", async () => {
+        const inherited = methodInheritedContext();
+        const box = document.getElementById("methodAdviceOutput");
+        if (!inherited) return generateMethodOutput("advice", "", box);
+        await generateMethodOutput("advice", methodAdvicePrompt(inherited.context, inherited.diagnosis), box);
+      });
+    }
+
+    function methodAdvicePrompt(context, diagnosis) {
+      return `请为本科生制定详细但简洁的研究方法建议。
+题目：${context.topic}
+目标水平：${context.level === "excellent" ? "90分左右" : "80分左右"}
+题目诊断：${diagnosis.diagnosis || "未提供"}
+写作建议：${diagnosis.basic || "未提供"}
+质量提升途径：${context.level === "excellent" ? diagnosis.improve || "未提供" : "本次不采用"}
+已确认提纲：${context.outline}
+
+必须保持一致：不得扩大研究对象和结论范围，不得新增无依据变量；每种方法都要对应提纲中的具体研究任务。按以下结构输出，总字数尽量控制在1400字以内：
+一、论文类型与总体研究逻辑
+二、核心研究问题与预期结果
+三、提纲章节—所需证据—数据来源—研究方法—分析方法对应关系（用分点文本，不用表格）
+四、研究实施步骤及先后顺序
+五、最低可行方案
+六、${context.level === "excellent" ? "90分左右的提升方案" : "达到80分左右水平的质量底线"}
+七、可行性与常见方法错误
+每种方法必须写清“目的、收集什么、支持哪一部分、如何分析”。`;
+    }
+
+    function methodSamplingHtml() {
+      const context = currentConfirmedMethodContext();
+      const output = methodOutput("sampling");
+      return `
+        <h3>研究对象、问卷发放与偏差控制</h3>
+        <p class="hint">系统会专门识别容易接触的对象、容易遗漏的对象，以及已经退出、失败、流失或拒绝参与的对象。</p>
+        <div class="notice ${context ? "ok" : "warn"}">${context ? `当前题目：${escapeHtml(context.topic)}` : "请先确认当前研究提纲。"}</div>
+        <div class="row" style="margin:12px 0;"><button class="btn primary" id="generateMethodSamplingBtn" type="button">生成研究对象与抽样建议</button></div>
+        <textarea id="methodSamplingOutput" class="coach-output" readonly>${escapeHtml(output || "等待生成。")}</textarea>`;
+    }
+
+    function wireMethodSampling() {
+      document.getElementById("generateMethodSamplingBtn")?.addEventListener("click", async () => {
+        const inherited = methodInheritedContext();
+        const box = document.getElementById("methodSamplingOutput");
+        if (!inherited) return generateMethodOutput("sampling", "", box);
+        await generateMethodOutput("sampling", methodSamplingPrompt(inherited.context, inherited.diagnosis), box);
+      });
+    }
+
+    function methodSamplingPrompt(context, diagnosis) {
+      return `请根据以下题目和已确认提纲，制定本科生能够执行的研究对象与抽样方案。
+题目：${context.topic}
+题目诊断：${diagnosis.diagnosis || "未提供"}
+写作建议：${diagnosis.basic || "未提供"}
+已确认提纲：${context.outline}
+
+请按以下结构简洁输出：
+一、目标总体与实际调查对象
+二、分层、对照或多来源对象建议
+三、问卷/访谈每类对象的基本样本量与获取渠道
+四、幸存者偏差专项检查：明确当前仍在、已经离职/退出/流失/放弃/失败、未购买或拒答等可能遗漏群体；说明本题具体会遗漏谁，如何补充或如何限制结论
+五、便利样本、无应答偏差和发放时点偏差控制
+六、样本覆盖清单：按“对象类别｜为什么需要｜建议数量｜获取渠道｜可能偏差｜控制办法”逐条列出
+七、隐私、知情同意与数据最小化要求
+不能笼统写“随机抽样”；必须结合学生实际可接触渠道给出可行方案，同时明确不能代表的群体。`;
+    }
+
+    const methodToolMeta = {
+      scale: { title: "成熟问卷与量表", button: "匹配成熟量表", ext: "txt" },
+      questionnaire: { title: "新问卷设计", button: "生成问卷初稿", ext: "txt" },
+      interview: { title: "访谈提纲", button: "生成访谈提纲", ext: "txt" },
+      table: { title: "数据收集统计表", button: "生成字段表", ext: "csv" }
+    };
+
+    function methodToolsHtml() {
+      const context = currentConfirmedMethodContext();
+      return `
+        <h3>研究工具</h3>
+        <p class="hint">优先使用可核验的成熟量表；新问卷必须预测试。所有工具都要能够支持已确认提纲中的研究问题、变量或需要论证的内容。</p>
+        <div class="notice ${context ? "ok" : "warn"}">${context ? `当前题目：${escapeHtml(context.topic)}` : "请先确认当前研究提纲。"}</div>
+        <div class="method-tool-grid">
+          ${Object.entries(methodToolMeta).map(([kind, meta]) => {
+            const ready = !!methodOutput(`tool_${kind}`);
+            return `<div class="mini-card"><strong>${meta.title}</strong><p>${methodToolDescription(kind)}</p><div class="row" style="margin-top:12px;"><button class="btn primary" data-method-tool-generate="${kind}">${meta.button}</button><button class="btn" data-method-tool-preview="${kind}" ${ready ? "" : "disabled"}>预览</button><button class="btn" data-method-tool-download="${kind}" ${ready ? "" : "disabled"}>下载</button></div><div class="hint" style="margin-top:8px;">${ready ? "已生成，可预览或下载。" : "尚未生成。"}</div></div>`;
+          }).join("")}
+        </div>`;
+    }
+
+    function methodToolDescription(kind) {
+      const descriptions = {
+        scale: "推荐与变量匹配的成熟量表、来源线索、维度、计分和适用对象；来源必须由学生核验。",
+        questionnaire: "在没有合适成熟量表或需要调查具体管理问题时，形成可供教师审核和预测试的问卷初稿。",
+        interview: "按访谈对象、问题目的、提纲章节和后续编码方向组织半结构化访谈问题。",
+        table: "生成可直接填写的CSV字段模板，并说明字段、编码、数据来源和支持的研究问题。"
+      };
+      return descriptions[kind] || "";
+    }
+
+    function wireMethodTools() {
+      document.querySelectorAll("[data-method-tool-generate]").forEach((btn) => btn.addEventListener("click", async () => {
+        const kind = btn.dataset.methodToolGenerate;
+        const inherited = methodInheritedContext();
+        if (!inherited) {
+          alert("请先在“题目与提纲”中确认当前研究提纲。");
+          return;
+        }
+        btn.disabled = true;
+        btn.textContent = "正在生成...";
+        const holder = { value: "" };
+        const content = await generateMethodOutput(`tool_${kind}`, methodToolPrompt(kind, inherited.context, inherited.diagnosis), holder);
+        btn.disabled = false;
+        btn.textContent = methodToolMeta[kind].button;
+        if (content) {
+          setSubContent("method", "tools", methodToolsHtml());
+          openMethodToolPreview(kind);
+        }
+      }));
+      document.querySelectorAll("[data-method-tool-preview]").forEach((btn) => btn.addEventListener("click", () => openMethodToolPreview(btn.dataset.methodToolPreview)));
+      document.querySelectorAll("[data-method-tool-download]").forEach((btn) => btn.addEventListener("click", () => downloadMethodTool(btn.dataset.methodToolDownload)));
+    }
+
+    function methodToolPrompt(kind, context, diagnosis) {
+      const shared = `题目：${context.topic}\n题目诊断：${diagnosis.diagnosis || "未提供"}\n写作建议：${diagnosis.basic || "未提供"}\n已确认提纲：${context.outline}\n已有研究方法建议：${methodOutput("advice") || "未生成"}\n研究对象与抽样建议：${methodOutput("sampling") || "未生成"}`;
+      if (kind === "scale") return `${shared}\n\n请推荐与本题变量匹配的成熟问卷或量表。逐个写：量表名称、变量与维度、原作者及年代、适用对象、题项数量、计分方式、中文版/本土化来源线索、原始论文或DOI检索线索、与本题匹配理由、使用与版权注意。增加“题项预览”：只有确信属于公开且可核验的题项时才列出代表性题项；不能确认时写“题项需从原始文献或授权来源获取”，不得自行补造。不得编造链接、作者或信效度数字；不能确认时明确写“需核验”。最后说明选定量表后如何支持提纲中的变量或假设。`;
+      if (kind === "questionnaire") return `${shared}\n\n请生成一份结构完整的新问卷初稿，包括调查说明与知情同意、筛选题、基本信息与控制变量、按研究变量/维度组织的题项、计分方式、必要的注意力检查、结束语。每组题项标明来源依据和支持的研究问题/提纲部分；不得把AI自拟题项称为成熟量表。结尾必须提示：需指导教师审核、预测试及信效度检验后才能正式发放。`;
+      if (kind === "interview") return `${shared}\n\n请生成半结构化访谈提纲。依次包括访谈说明、访谈对象分类、开场问题、核心问题、追问、结束问题。每个核心问题后标注“提问目的、适合对象、支持的提纲部分、后续编码方向”。专门覆盖容易被忽略或退出的对象，避免诱导性问题和只访问表现良好者。`;
+      return `${shared}\n\n请只输出可直接保存为CSV的内容，不要解释，不要Markdown代码框。第一行为字段名。至少包含：样本编号,对象类别,所属分层,当前或退出状态,数据来源,收集日期,核心变量字段,变量角色,测量或编码规则,缺失值标记,退出或未完成原因,对应研究问题,对应提纲章节,备注。根据本题补充具体变量字段，每个字段单独一行；所有含逗号的单元格必须使用双引号包裹。`;
+    }
+
+    function methodConfirmHtml() {
+      const context = currentConfirmedMethodContext();
+      const sourceId = methodSourceId("final");
+      const workspace = methodWorkspace();
+      const saved = sourceId ? workspace.finals?.[sourceId]?.content || "" : "";
+      const suggested = saved || [methodOutput("advice"), methodOutput("sampling")].filter(Boolean).join("\n\n") || "请先生成研究方法建议和研究对象与抽样建议。";
+      return `
+        <h3>确认当前可执行的研究方法方案</h3>
+        <p class="hint">请结合实际能够接触的对象、样本量、企业资料和软件能力修改。确认后，后续数据获取助手应以此方案为依据。</p>
+        <div class="notice ${context ? "ok" : "warn"}">${context ? `当前提纲版本：${escapeHtml(context.versionLabel)} · ${escapeHtml(context.source)}` : "请先确认当前研究提纲。"}</div>
+        <div class="field" style="margin-top:12px;"><label>当前研究方法方案</label><textarea id="methodFinalText" class="coach-output">${escapeHtml(suggested)}</textarea></div>
+        <div class="row"><button class="btn primary" id="confirmMethodPlanBtn" type="button">确认方法方案</button><button class="btn" id="downloadMethodPlanBtn" type="button">下载方案</button></div>
+        <div id="methodFinalStatus" class="notice ${saved ? "ok" : ""}" style="margin-top:12px;">${saved ? `已确认，时间：${escapeHtml(workspace.finals[sourceId].confirmedAt || "")}` : "尚未确认。"}</div>`;
+    }
+
+    function wireMethodConfirm() {
+      document.getElementById("confirmMethodPlanBtn")?.addEventListener("click", () => {
+        const context = currentConfirmedMethodContext();
+        const status = document.getElementById("methodFinalStatus");
+        const content = document.getElementById("methodFinalText").value.trim();
+        if (!context || !content) {
+          status.className = "notice warn";
+          status.textContent = "请先确认提纲并形成可执行的方法方案。";
+          return;
+        }
+        const sourceId = methodSourceId("final");
+        const workspace = methodWorkspace();
+        const finals = { ...(workspace.finals || {}), [sourceId]: { content, confirmedAt: new Date().toLocaleString(), outlineVersion: context.version } };
+        saveMethodWorkspace({ finals });
+        saveProject({ method: "研究方法方案已确认", stage: "研究方法已确认", progress: Math.max(project.progress || 0, 58) });
+        status.className = "notice ok";
+        status.textContent = "研究方法方案已确认，后续数据获取应按此方案执行。";
+      });
+      document.getElementById("downloadMethodPlanBtn")?.addEventListener("click", () => {
+        downloadTextFile(`${currentConfirmedMethodContext()?.topic || "论文"}-研究方法方案.txt`, document.getElementById("methodFinalText").value, "text/plain;charset=utf-8");
+      });
+    }
+
+    function methodOutputFallback(kind, context, errorMessage) {
+      if (kind === "sampling") return `研究对象与抽样建议\n\n目标总体：围绕“${context.topic}”界定真正需要解释的全部对象。\n抽样要求：覆盖不同层级、阶段和状态，不能只调查最容易接触的人。\n幸存者偏差：除当前仍在职、仍使用或已经成功的对象外，还要考虑离职、退出、流失、放弃、未完成或拒答群体；无法取得时必须限制结论范围。\n偏差控制：记录发放数、回收数、无效数和拒答情况，比较主要群体的样本结构。\n\n模型暂不可用：${errorMessage || "请稍后重试"}`;
+      if (kind === "tool_table") return "样本编号,对象类别,所属分层,当前或退出状态,数据来源,收集日期,核心变量字段,变量角色,测量或编码规则,缺失值标记,退出或未完成原因,对应研究问题,对应提纲章节,备注";
+      if (kind.startsWith("tool_")) return `${methodToolMeta[kind.replace("tool_", "")]?.title || "研究工具"}\n\n模型暂不可用，尚不能根据当前提纲生成个性化工具。请稍后重试。\n${errorMessage || ""}`;
+      return `研究方法建议\n\n题目：${context.topic}\n基本逻辑：先从已确认提纲提取研究问题，再逐项确定证据、数据来源、获取方法和分析方法。每种方法都必须支持某一章或某个研究结论。\n最低方案：文献分析与一种主要数据来源相结合，完成数据清理、描述分析和与题目匹配的关系或问题分析。\n常见错误：方法与提纲脱节、只写方法名称不写目的、样本无法支持分析、结论超出研究对象。\n\n模型暂不可用：${errorMessage || "请稍后重试"}`;
+    }
+
+    let activeMethodToolKind = "";
+
+    function openMethodToolPreview(kind) {
+      const content = methodOutput(`tool_${kind}`);
+      if (!content) return;
+      activeMethodToolKind = kind;
+      document.getElementById("methodToolPreviewTitle").textContent = methodToolMeta[kind].title;
+      document.getElementById("methodToolPreviewContent").textContent = content;
+      document.getElementById("methodToolPreview").classList.add("show");
+    }
+
+    function wireMethodToolPreview() {
+      const box = document.getElementById("methodToolPreview");
+      const head = document.getElementById("methodToolPreviewHead");
+      if (!box || box.dataset.wired) return;
+      box.dataset.wired = "true";
+      document.getElementById("methodToolPreviewClose").addEventListener("click", () => box.classList.remove("show"));
+      document.getElementById("methodToolPreviewFull").addEventListener("click", () => box.classList.toggle("fullscreen"));
+      document.getElementById("methodToolPreviewDownload").addEventListener("click", () => downloadMethodTool(activeMethodToolKind));
+      let dragging = false, offsetX = 0, offsetY = 0;
+      head.addEventListener("pointerdown", (event) => {
+        if (event.target.closest("button")) return;
+        dragging = true;
+        offsetX = event.clientX - box.offsetLeft;
+        offsetY = event.clientY - box.offsetTop;
+      });
+      document.addEventListener("pointermove", (event) => {
+        if (!dragging || box.classList.contains("fullscreen")) return;
+        box.style.left = Math.max(8, event.clientX - offsetX) + "px";
+        box.style.top = Math.max(8, event.clientY - offsetY) + "px";
+      });
+      document.addEventListener("pointerup", () => dragging = false);
+    }
+
+    function downloadMethodTool(kind) {
+      if (!kind || !methodToolMeta[kind]) return;
+      const content = methodOutput(`tool_${kind}`);
+      if (!content) return;
+      const topic = currentConfirmedMethodContext()?.topic || "论文";
+      const meta = methodToolMeta[kind];
+      downloadTextFile(`${topic}-${meta.title}.${meta.ext}`, kind === "table" ? cleanCsvContent(content) : content, kind === "table" ? "text/csv;charset=utf-8" : "text/plain;charset=utf-8");
+    }
+
+    function cleanCsvContent(content) {
+      return String(content || "").replace(/^```(?:csv)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    }
+
+    function downloadTextFile(fileName, content, mimeType) {
+      const safeName = String(fileName || "下载文件.txt").replace(/[\\/:*?"<>|]/g, "-");
+      const blob = new Blob(["\ufeff", content || ""], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = safeName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
     function methodSubmodules() {
