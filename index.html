@@ -442,6 +442,70 @@
       .method-tool-grid { grid-template-columns: 1fr; }
     }
 
+    .method-chat-context {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--teal);
+      background: #f8fafc;
+      margin-bottom: 10px;
+    }
+
+    .method-chat-log {
+      height: 520px;
+      overflow-y: auto;
+      padding: 14px;
+      border: 1px solid var(--line);
+      background: #f3f6fa;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .chat-message { display: flex; gap: 10px; align-items: flex-start; max-width: 88%; }
+    .chat-message.user { align-self: flex-end; flex-direction: row-reverse; }
+    .chat-avatar {
+      width: 42px;
+      height: 42px;
+      flex: 0 0 42px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #fff;
+      border: 2px solid #dbe4f0;
+      box-shadow: 0 4px 12px rgba(15,23,42,.12);
+    }
+    .chat-user-avatar {
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: linear-gradient(135deg, var(--brand), var(--teal));
+      font-weight: 800;
+    }
+    .chat-bubble {
+      padding: 11px 13px;
+      border-radius: 8px;
+      background: #fff;
+      border: 1px solid var(--line);
+      line-height: 1.72;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      box-shadow: 0 5px 14px rgba(15,23,42,.055);
+    }
+    .chat-message.user .chat-bubble { background: #e8f1ff; border-color: #bfd3fa; }
+    .method-chat-composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; margin-top: 10px; align-items: end; }
+    .method-chat-composer textarea { min-height: 88px; max-height: 180px; }
+    .chat-quick { display: flex; gap: 7px; flex-wrap: wrap; margin: 10px 0; }
+    .chat-quick .btn { padding: 7px 10px; min-height: 34px; font-size: 13px; }
+    @media (max-width: 700px) {
+      .method-chat-log { height: 460px; padding: 10px; }
+      .chat-message { max-width: 96%; }
+      .chat-avatar { width: 36px; height: 36px; flex-basis: 36px; }
+      .method-chat-composer { grid-template-columns: 1fr; }
+    }
+
     .subnav {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -2120,6 +2184,7 @@
       if (moduleId === "method" && subId === "advice") wireMethodAdvice();
       if (moduleId === "method" && subId === "sampling") wireMethodSampling();
       if (moduleId === "method" && subId === "tools") wireMethodTools();
+      if (moduleId === "method" && subId === "chat") wireMethodChat();
       if (moduleId === "method" && subId === "confirm") wireMethodConfirm();
     }
 
@@ -3306,7 +3371,7 @@ JSON字段必须包括：
         }
     }
 
-    const TOPIC_DIAGNOSIS_RULE_VERSION = "topic-diagnosis-v1";
+    const TOPIC_DIAGNOSIS_RULE_VERSION = "topic-diagnosis-v2";
 
     function normalizeTopicTitle(title) {
       return String(title || "")
@@ -3331,7 +3396,7 @@ JSON字段必须包括：
 
     async function getCachedTopicTitleDiagnosis(title) {
       const normalized = normalizeTopicTitle(title);
-      const localRecord = topicDiagnosisHistory().find((item) => normalizeTopicTitle(item.title) === normalized && item.diagnosis);
+      const localRecord = topicDiagnosisHistory().find((item) => normalizeTopicTitle(item.title) === normalized && item.diagnosis && item.diagnosisVersion === TOPIC_DIAGNOSIS_RULE_VERSION);
       if (localRecord?.diagnosis) return localRecord.diagnosis;
       try {
         const cached = await callCloudFunction("getTopicTitleDiagnosis", { cacheId: topicDiagnosisCacheId(title) });
@@ -3362,9 +3427,14 @@ JSON字段必须包括：
           const normalized = normalizeTopicTitle(cloudItem.title);
           const existing = merged.find((item) => normalizeTopicTitle(item.title) === normalized);
           if (existing) {
+            if (cloudItem.diagnosisVersion === TOPIC_DIAGNOSIS_RULE_VERSION && existing.diagnosisVersion !== TOPIC_DIAGNOSIS_RULE_VERSION) {
+              existing.diagnosis = cloudItem.diagnosis || existing.diagnosis;
+              existing.diagnosisVersion = cloudItem.diagnosisVersion;
+            }
             ["diagnosis", "basic", "improve"].forEach((level) => {
               if (!existing[level] && cloudItem[level]) existing[level] = cloudItem[level];
             });
+            if (!existing.diagnosisVersion && cloudItem.diagnosisVersion) existing.diagnosisVersion = cloudItem.diagnosisVersion;
             existing.updatedAt = existing.updatedAt || cloudItem.updatedAt || cloudItem.createdAt || "";
           } else {
             merged.push(cloudItem);
@@ -3384,12 +3454,13 @@ JSON字段必须包括：
       const record = history.find((item) => item.title === title);
       if (record) {
         record[level] = content;
+        if (level === "diagnosis") record.diagnosisVersion = TOPIC_DIAGNOSIS_RULE_VERSION;
         record.updatedAt = now;
       } else {
-        history.unshift({ id: Date.now().toString(), title, [level]: content, createdAt: now, updatedAt: now });
+        history.unshift({ id: Date.now().toString(), title, [level]: content, ...(level === "diagnosis" ? { diagnosisVersion: TOPIC_DIAGNOSIS_RULE_VERSION } : {}), createdAt: now, updatedAt: now });
       }
       setUserStorage("topicDiagnosisHistory", JSON.stringify(history.slice(0, 50)));
-      syncCloud("saveTopicDiagnosis", { title, level, content });
+      syncCloud("saveTopicDiagnosis", { title, level, content, ruleVersion: level === "diagnosis" ? TOPIC_DIAGNOSIS_RULE_VERSION : "" });
       if (level === "diagnosis" && !options.skipSharedSave) {
         syncCloud("saveTopicTitleDiagnosisFirst", {
           cacheId: topicDiagnosisCacheId(title),
@@ -3432,20 +3503,21 @@ JSON字段必须包括：
 学生题目：${draft}
 
 诊断原则：
-1. 不要因为题目看起来完整就直接认可，也不要替学生编造研究意义。
-2. 识别题目中的行业、地区、企业规模、企业性质、年龄/代际、岗位/员工类别、具体企业、特定场景等限定词。逐个判断该限定是“会改变研究问题的必要研究边界”，还是仅因学生容易接触样本而形成的“取样便利边界”。
-3. 每个限定词都要追问：为什么是这一类对象；与非该类对象相比有什么可验证的特殊性；这种特殊性是否会改变核心问题或变量关系；能用什么文献、行业数据或企业资料证明。
-4. 如果只调查一家企业，不得默认它代表整个行业或某类企业。检查题目是否存在由单个案例过度推广到整个群体的问题；代表性不足时，应明确写X企业或“以X企业为例”。
-5. 对“问题与优化”类题目，检查问题是否可被证据证明，不能把现状直接当问题；对“X影响Y”“中介/调节作用”类题目，检查变量角色、方向和作用机制是否有理论依据；对其他类型也检查研究对象、核心问题和预期结果是否对应。
-6. 按本科论文通常标准评价：表述是否规范、对象是否明确、范围是否适中、研究问题是否清楚、研究价值是否成立、资料与数据是否可获得、难度是否可控。
+1. 采用最小干预原则。诊断的目标是判断题目是否需要修改，而不是必须找出缺点。不得为了显示诊断能力而强行否定题目，也不得把“正文需要进一步论证”误判为“题目不成立”。
+2. 先判断题目的优点与成立条件，再检查问题。若表述规范、对象明确、范围适中、逻辑清楚、数据可获得，应直接认可，不得给出只是换一种说法的替代题目。
+3. 识别行业、地区、企业规模、企业性质、年龄/代际、岗位/员工类别、具体企业、特定场景等限定词。限定词需要在正文中解释，不等于必须删改；只有它造成范围失真、逻辑冲突或无证据可支持时，才构成题目问题。
+4. 每个限定词可追问：为什么是这一类对象；与非该类对象有何可验证差异；这种差异是否改变核心问题或变量关系；能用什么文献、行业数据或企业资料说明。若这些内容可在绪论或文献综述中合理回答，应判断为“可以使用，但需在论文中说明”。
+5. 如果只调查一家企业，却把结论表达为整个行业或某类企业的一般结论，属于实质问题；但题目已经明确X企业或“以X企业为例”时，不得再以代表性为由强行否定，只需提醒结论边界。
+6. 对“问题与优化”类题目，检查问题能否用标准、目标、比较或结果证据证明；对变量关系题目，检查变量角色和机制是否有理论依据。尚未确定样本量、量表、检索词或具体统计步骤，通常属于后续研究设计任务，不是改题理由。
+7. 只有出现以下实质问题才建议改题：对象与结论范围明显不匹配；核心概念或变量逻辑不成立；范围明显超过本科能力；题目要求的数据基本无法获得；多个研究任务互相冲突；标题存在明确语病或概念错误。
 
 请严格按以下格式简洁输出，总字数尽量控制在700字以内：
-一、诊断结论：用“可以保留 / 修改后可用 / 建议重新拟定”三选一，并用2-3句话说明。
-二、关键问题：按重要程度列出不超过5点，每一点必须紧扣题目中的具体词语。
-三、限定词检查：逐个写“限定词｜是否必要｜学生必须证明什么”。没有限定词则写“无明显多余限定”。
-四、代表性与边界：说明结论可以适用于谁，不能轻易推广到谁。
-五、确定题目前必须回答：提出3-5个学生需要用文献或事实回答的问题。
-六、建议题目：仅在确有必要时给出1-3个版本，并分别说明适用条件。
+一、诊断结论：必须从“可以直接使用 / 可以使用，但需在论文中说明 / 小幅修改后使用 / 建议重新拟定”中选择一项，并用2-3句话说明。
+二、题目成立的依据：先写2-4项具体优点；不能只写缺点。
+三、是否存在实质性问题：有则按重要程度列出不超过4点；没有则明确写“未发现必须改题的实质性问题”。
+四、限定词与研究边界：逐个说明哪些需要正文论证，以及结论可以适用于谁。需要论证不等于需要删改。
+五、正文中需要完成的任务：提出3-5个需要用文献、数据或事实回答的问题。
+六、是否需要修改题目：若结论为“可以直接使用”或“可以使用，但需在论文中说明”，明确写“无需修改题目”，不得提供备选题目；只有结论为后两档时，才给出1-3个修改版本并说明修改原因。
 
 例如题目含“互联网企业、新生代员工”时，必须检查这两个限定是否会改变研究关系；学生只是能接触一家互联网企业和年轻员工，不足以证明限定词有研究意义。题目含“小型高新技术企业、一线员工、以X企业为例”时，必须分别检查企业规模、行业属性、员工类别和案例代表性，不能用X企业直接代表整个小型高新技术企业群体。`;
     }
@@ -3481,29 +3553,29 @@ C. 如题目包含调节作用或中介作用，请说明调节/中介的区别�
       if (/X企业|X公司|某企业|某公司|为例/.test(draft)) qualifiers.push("具体案例限定");
       const relation = /影响|中介|调节|关系/.test(draft);
       const problem = /问题|优化|提升|对策/.test(draft);
-      return `一、诊断结论：修改后可用
-题目已经包含研究对象和核心问题，但仍需证明限定词的必要性，并核对实际样本与题目所声称的研究范围是否一致。
+      const conclusion = qualifiers.length ? "可以使用，但需在论文中说明" : "可以直接使用";
+      return `一、诊断结论：${conclusion}
+题目已经包含研究对象和核心问题。${qualifiers.length ? "限定词需要在绪论或文献综述中说明选择依据，但这本身不构成改题理由。" : "目前未发现必须修改题目的明显问题。"}
 
-二、关键问题
-1. ${qualifiers.length ? `题目包含${qualifiers.join("、")}，不能只用“方便接触样本”解释。` : "需要进一步明确研究对象和研究边界。"}
-2. ${relation ? "变量之间的方向及中介/调节机制必须有理论和既有文献依据。" : problem ? "必须用目标、标准、比较或结果数据证明问题，不能把某个现状直接当成问题。" : "核心研究问题和预期产出需要对应。"}
-3. 如果资料只来自一家单位，结论原则上只能解释该案例，不能直接代表整个行业或企业类别。
+二、题目成立的依据
+1. 研究对象和研究主题基本明确。
+2. ${relation ? "变量关系和预期检验方向能够识别。" : problem ? "问题诊断与优化的研究任务能够识别。" : "核心研究任务基本能够识别。"}
+3. 题目可以通过文献与实际资料进一步落实。
 
-三、限定词检查
-${qualifiers.length ? qualifiers.map((item) => `${item}｜需要论证｜说明它与其他对象有何差异，以及这种差异为何会改变本题的研究问题。`).join("\n") : "无明显多余限定，但仍需说明对象选择依据。"}
+三、是否存在实质性问题
+未发现必须改题的实质性问题。后续若实际样本与题目声称的范围不一致，再根据真实数据条件调整。
 
-四、代表性与边界
-样本来自单个企业时，应在题目中明确X企业或“以X企业为例”；只有取得多家同类企业且结构合理的样本，才适合讨论该类企业的普遍结论。
+四、限定词与研究边界
+${qualifiers.length ? qualifiers.map((item) => `${item}｜可以保留｜需要在正文说明选择依据和适用边界。`).join("\n") : "无明显多余限定。"}
+若样本只来自一家单位，结论应主要解释该案例；题目已经明确X企业或“以X企业为例”时，不应再以代表性为由强行否定题目。
 
-五、确定题目前必须回答
-1. 为什么必须研究题目中限定的行业、企业或群体？
-2. 与未被限定的对象相比，有什么可以验证的特殊性？
-3. 这种特殊性会不会改变核心问题或变量关系？
-4. 现有文献、行业数据或企业资料能否证明以上判断？
-5. 实际能够获得的数据支持多大范围的结论？
+五、正文中需要完成的任务
+1. 说明研究对象和场景的选择依据。
+2. ${relation ? "用理论和既有文献说明变量关系及中介/调节机制。" : problem ? "用目标、标准、比较或结果证据证明问题，避免把现状直接当问题。" : "说明研究问题与预期结果如何对应。"}
+3. 说明数据来源、样本边界和结论适用范围。
 
-六、建议题目
-若限定词有证据支持，可保留原题；若只有一家企业样本，建议改为以X企业为明确研究主体的版本；若限定词仅来自取样便利，建议删除不能证明的行业或群体标签。
+六、是否需要修改题目
+无需修改题目。以上事项属于正文论证和研究设计任务，不应为了形式变化强行另拟题目。
 
 提示：模型服务暂不可用，以上为系统内置题目诊断框架。${errorMessage ? `（${errorMessage}）` : ""}`;
     }
@@ -4597,6 +4669,7 @@ ${diagnosis.diagnosis || "未提供；不得自行扩大题目研究对象和结
         ["advice", "研究方法建议"],
         ["sampling", "研究对象与抽样"],
         ["tools", "研究工具"],
+        ["chat", "研究方法问答智能体"],
         ["confirm", "方法方案确认"]
       ]) + `
         <div id="methodToolPreview" class="lit-preview">
@@ -4616,6 +4689,7 @@ ${diagnosis.diagnosis || "未提供；不得自行扩大题目研究对象和结
         advice: () => methodAdviceHtml(),
         sampling: () => methodSamplingHtml(),
         tools: () => methodToolsHtml(),
+        chat: () => methodChatHtml(),
         confirm: () => methodConfirmHtml()
       });
       wireMethodToolPreview();
@@ -4975,12 +5049,209 @@ ${diagnosis.diagnosis || "未提供；不得自行扩大题目研究对象和结
       return `${shared}\n\n请只输出可直接保存为CSV的内容，不要解释，不要Markdown代码框。第一行为字段名。至少包含：样本编号,对象类别,所属分层,当前或退出状态,数据来源,收集日期,核心变量字段,变量角色,测量或编码规则,缺失值标记,退出或未完成原因,对应研究问题,对应提纲章节,备注。根据本题补充具体变量字段，每个字段单独一行；所有含逗号的单元格必须使用双引号包裹。`;
     }
 
+    function methodChatId() {
+      const context = currentConfirmedMethodContext();
+      return context ? `method-chat-${simpleHash(`${context.topic}|${context.outline}|${context.version}`)}` : "";
+    }
+
+    function methodChatMessages() {
+      const chatId = methodChatId();
+      if (!chatId) return [];
+      try {
+        return JSON.parse(getUserStorage(chatId, "[]") || "[]");
+      } catch (error) {
+        return [];
+      }
+    }
+
+    function saveMethodChatMessages(messages) {
+      const chatId = methodChatId();
+      if (!chatId) return;
+      const trimmed = messages.slice(-80);
+      setUserStorage(chatId, JSON.stringify(trimmed));
+      syncCloud("saveMethodChat", { chatId, messages: trimmed, topic: currentConfirmedMethodContext()?.topic || "", outlineVersion: currentConfirmedMethodContext()?.version || "" });
+    }
+
+    async function hydrateMethodChat() {
+      const chatId = methodChatId();
+      if (!chatId || localStorage.getItem(userStorageKey(chatId)) !== null) return;
+      try {
+        const cloud = await callCloudFunction("getMethodChat", { chatId });
+        const messages = cloud?.payload?.messages || cloud?.messages || [];
+        if (messages.length) {
+          setUserStorage(chatId, JSON.stringify(messages));
+          setSubContent("method", "chat", methodChatHtml());
+        }
+      } catch (error) {
+        // A new outline version normally has no conversation yet.
+      }
+    }
+
+    function methodChatHtml() {
+      const context = currentConfirmedMethodContext();
+      const messages = methodChatMessages();
+      const userName = currentLoginUser().name || "同学";
+      const readyTools = Object.keys(methodToolMeta).filter((kind) => methodOutput(`tool_${kind}`)).map((kind) => methodToolMeta[kind].title);
+      return `
+        <h3>研究方法问答智能体</h3>
+        <div class="method-chat-context">
+          <strong>${context ? escapeHtml(context.topic) : "尚未确认题目与提纲"}</strong>
+          ${context ? `<span class="tag">${context.level === "excellent" ? "90分左右" : "80分左右"}提纲</span><span class="tag">${escapeHtml(context.source)}</span><span class="tag">已生成工具：${readyTools.length ? readyTools.join("、") : "暂无"}</span>` : ""}
+        </div>
+        <div class="chat-quick">
+          ${["访谈资料如何提取字段和打标签？", "文本资料如何编码并统计？", "成熟量表可以删改题项吗？", "问卷样本量不足怎么办？", "定性资料如何支撑论文结论？", "如何避免只选择支持自己观点的材料？"].map((q) => `<button class="btn" type="button" data-method-quick-question="${escapeHtml(q)}">${escapeHtml(q)}</button>`).join("")}
+        </div>
+        <div id="methodChatLog" class="method-chat-log">${methodChatMessagesHtml(messages, userName)}</div>
+        <div class="method-chat-composer">
+          <textarea id="methodChatInput" placeholder="结合当前题目和研究工具提问，例如：如果采用访谈法，如何提取字段、设置标签并进行统计？" ${context ? "" : "disabled"}></textarea>
+          <button class="btn primary" id="sendMethodChatBtn" type="button" ${context ? "" : "disabled"}>发送</button>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn" id="addMethodChatToPlanBtn" type="button" ${messages.some((item) => item.role === "assistant") ? "" : "disabled"}>将最后回答加入待确认方案</button>
+          <button class="btn" id="downloadMethodChatBtn" type="button" ${messages.length ? "" : "disabled"}>下载对话记录</button>
+          <button class="btn danger" id="clearMethodChatBtn" type="button" ${messages.length ? "" : "disabled"}>清空当前对话</button>
+        </div>`;
+    }
+
+    function methodChatMessagesHtml(messages, userName) {
+      if (!messages.length) {
+        return `<div class="chat-message assistant"><img class="chat-avatar" src="icons/ai-tutor-avatar.png" alt="AI论文指导教师"><div class="chat-bubble">同学你好。我会结合你已经确认的题目、提纲、研究方法建议和研究工具回答问题。你可以具体询问访谈编码、文本字段、标签统计、量表使用、问卷分析或抽样偏差。</div></div>`;
+      }
+      const initial = String(userName || "同学").trim().slice(0, 1) || "学";
+      return messages.map((item) => item.role === "assistant"
+        ? `<div class="chat-message assistant"><img class="chat-avatar" src="icons/ai-tutor-avatar.png" alt="AI论文指导教师"><div class="chat-bubble">${escapeHtml(item.content || "")}</div></div>`
+        : `<div class="chat-message user"><div class="chat-avatar chat-user-avatar" aria-label="学生">${escapeHtml(initial)}</div><div class="chat-bubble">${escapeHtml(item.content || "")}</div></div>`
+      ).join("");
+    }
+
+    function wireMethodChat() {
+      hydrateMethodChat();
+      const input = document.getElementById("methodChatInput");
+      const send = document.getElementById("sendMethodChatBtn");
+      document.querySelectorAll("[data-method-quick-question]").forEach((btn) => btn.addEventListener("click", () => {
+        if (!input) return;
+        input.value = btn.dataset.methodQuickQuestion;
+        input.focus();
+      }));
+      send?.addEventListener("click", () => sendMethodChatQuestion());
+      input?.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          sendMethodChatQuestion();
+        }
+      });
+      document.getElementById("clearMethodChatBtn")?.addEventListener("click", () => {
+        if (!confirm("确定清空当前题目和提纲版本下的研究方法对话吗？")) return;
+        saveMethodChatMessages([]);
+        setSubContent("method", "chat", methodChatHtml());
+      });
+      document.getElementById("downloadMethodChatBtn")?.addEventListener("click", () => {
+        const text = methodChatMessages().map((item) => `${item.role === "assistant" ? "AI论文指导教师" : "学生"}：\n${item.content}`).join("\n\n");
+        downloadTextFile(`${currentConfirmedMethodContext()?.topic || "论文"}-研究方法问答.txt`, text, "text/plain;charset=utf-8");
+      });
+      document.getElementById("addMethodChatToPlanBtn")?.addEventListener("click", () => addLastMethodChatAnswerToPlan());
+      scrollMethodChatToBottom();
+    }
+
+    async function sendMethodChatQuestion() {
+      const context = currentConfirmedMethodContext();
+      const input = document.getElementById("methodChatInput");
+      const send = document.getElementById("sendMethodChatBtn");
+      const question = input?.value.trim() || "";
+      if (!context || !question || send?.disabled) return;
+      const messages = methodChatMessages();
+      messages.push({ role: "user", content: question, at: new Date().toISOString() });
+      saveMethodChatMessages(messages);
+      input.value = "";
+      send.disabled = true;
+      send.textContent = "回答中...";
+      renderMethodChatLog(messages, true);
+      try {
+        const answer = await callModel(methodChatPrompt(question, messages), "你是耐心、严谨的本科毕业论文研究方法指导教师。回答必须结合当前学生的题目、提纲和已经形成的研究工具，不得泛泛讲授或代写虚假研究结果。");
+        messages.push({ role: "assistant", content: answer, at: new Date().toISOString() });
+      } catch (error) {
+        messages.push({ role: "assistant", content: `当前模型未能完成回答：${error.message}。请检查模型连接后重新提问。`, at: new Date().toISOString() });
+      }
+      saveMethodChatMessages(messages);
+      setSubContent("method", "chat", methodChatHtml());
+    }
+
+    function renderMethodChatLog(messages, waiting = false) {
+      const log = document.getElementById("methodChatLog");
+      if (!log) return;
+      log.innerHTML = methodChatMessagesHtml(messages, currentLoginUser().name || "同学") + (waiting ? `<div class="chat-message assistant"><img class="chat-avatar" src="icons/ai-tutor-avatar.png" alt="AI论文指导教师"><div class="chat-bubble">正在结合当前研究方案思考...</div></div>` : "");
+      scrollMethodChatToBottom();
+    }
+
+    function scrollMethodChatToBottom() {
+      const log = document.getElementById("methodChatLog");
+      if (log) log.scrollTop = log.scrollHeight;
+    }
+
+    function methodChatPrompt(question, messages) {
+      const inherited = methodInheritedContext();
+      const context = inherited.context;
+      const diagnosis = inherited.diagnosis;
+      const relevantTools = methodRelevantToolContext(question);
+      const recent = messages.slice(-10).map((item) => `${item.role === "assistant" ? "导师" : "学生"}：${item.content}`).join("\n");
+      return `请结合该学生已经形成的研究方案回答最后一个问题。
+题目：${context.topic}
+题目诊断与研究边界：${limitMethodContext(diagnosis.diagnosis || "未提供", 2200)}
+已确认提纲：${limitMethodContext(context.outline, 4200)}
+研究方法建议：${limitMethodContext(methodOutput("advice") || "未生成", 3500)}
+研究对象与抽样建议：${limitMethodContext(methodOutput("sampling") || "未生成", 2500)}
+与本问题相关的研究工具：${limitMethodContext(relevantTools || "暂无已生成工具", 5000)}
+最近对话：
+${limitMethodContext(recent, 5000)}
+
+学生当前问题：${question}
+
+回答要求：
+1. 先直接回答，再说明为什么、具体怎么做，并结合当前题目举例。
+2. 涉及访谈或文本时，说明分析单位、字段提取、初始标签、标签合并、一级/二级主题、频次或共现统计、返回原文核对，以及如何避免只选择支持观点的材料。
+3. 涉及量表或问卷时，说明题项来源、计分、删改风险、预测试、信效度和对应变量；不得把自编题项称为成熟量表。
+4. 涉及统计分析时，说明需要什么字段、编码方式、分析步骤、能够支持什么结论及不能推出什么。
+5. 明确回答支持提纲中的哪一部分，并指出常见错误。
+6. 信息不足且会显著改变答案时，先提出1-2个针对性问题；能够合理回答时不要反复追问。
+7. 如果建议会改变当前研究方法、对象、样本、工具或字段，结尾标注“【可能影响当前方法方案】”，但不要自动修改方案。
+8. 语言清楚、具体，避免冗长，总字数一般不超过1200字。`;
+    }
+
+    function methodRelevantToolContext(question) {
+      const parts = [];
+      if (/访谈|编码|标签|主题|定性|质性/.test(question)) parts.push(`访谈提纲：\n${methodOutput("tool_interview") || "未生成"}`);
+      if (/量表|问卷|题项|信度|效度|计分/.test(question)) parts.push(`成熟量表：\n${methodOutput("tool_scale") || "未生成"}\n问卷初稿：\n${methodOutput("tool_questionnaire") || "未生成"}`);
+      if (/字段|文本|统计表|数据表|编码|变量|缺失/.test(question)) parts.push(`数据收集表：\n${methodOutput("tool_table") || "未生成"}`);
+      if (/样本|抽样|发放|幸存者|偏差|调查对象/.test(question)) parts.push(`抽样建议：\n${methodOutput("sampling") || "未生成"}`);
+      return parts.length ? parts.join("\n\n") : "根据问题未匹配到专门工具，请主要依据提纲和研究方法建议回答。";
+    }
+
+    function limitMethodContext(text, maxLength) {
+      const value = String(text || "");
+      return value.length > maxLength ? value.slice(0, maxLength) + "\n[内容已截取]" : value;
+    }
+
+    function addLastMethodChatAnswerToPlan() {
+      const last = [...methodChatMessages()].reverse().find((item) => item.role === "assistant");
+      const context = currentConfirmedMethodContext();
+      if (!last || !context) return;
+      const workspace = methodWorkspace();
+      const key = methodSourceId("final");
+      const additions = { ...(workspace.chatPlanAdditions || {}) };
+      const list = additions[key] || [];
+      if (!list.includes(last.content)) list.push(last.content);
+      additions[key] = list.slice(-10);
+      saveMethodWorkspace({ chatPlanAdditions: additions });
+      alert("最后一条回答已加入待确认方法方案。请到“方法方案确认”中审核和修改。" );
+    }
+
     function methodConfirmHtml() {
       const context = currentConfirmedMethodContext();
       const sourceId = methodSourceId("final");
       const workspace = methodWorkspace();
       const saved = sourceId ? workspace.finals?.[sourceId]?.content || "" : "";
-      const suggested = saved || [methodOutput("advice"), methodOutput("sampling")].filter(Boolean).join("\n\n") || "请先生成研究方法建议和研究对象与抽样建议。";
+      const chatAdditions = sourceId ? workspace.chatPlanAdditions?.[sourceId] || [] : [];
+      const suggested = saved || [methodOutput("advice"), methodOutput("sampling"), chatAdditions.length ? `问答智能体中待确认的补充建议：\n${chatAdditions.join("\n\n")}` : ""].filter(Boolean).join("\n\n") || "请先生成研究方法建议和研究对象与抽样建议。";
       return `
         <h3>确认当前可执行的研究方法方案</h3>
         <p class="hint">请结合实际能够接触的对象、样本量、企业资料和软件能力修改。确认后，后续数据获取助手应以此方案为依据。</p>

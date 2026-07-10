@@ -1,10 +1,11 @@
-const CACHE_NAME = "thesis-ai-assistant-v1";
+const CACHE_NAME = "thesis-ai-assistant-v2";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
-  "./icons/icon-512.png"
+  "./icons/icon-512.png",
+  "./icons/ai-tutor-avatar.png"
 ];
 
 self.addEventListener("install", (event) => {
