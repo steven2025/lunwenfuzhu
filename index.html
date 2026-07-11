@@ -457,6 +457,20 @@
     .sub-btn[data-module="collection"][data-sub="public"].active { color: #fff; border-color: transparent; background: linear-gradient(135deg, #ea580c, #c2410c); }
     .search-quota-badge { display: inline-flex; align-items: center; min-height: 38px; padding: 7px 12px; border: 1px solid #bae6d3; background: #ecfdf5; color: #047857; font-weight: 750; }
     .admin-search-table td, .admin-search-table th { white-space: nowrap; }
+    .analysis-mode-tabs, .analysis-step-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    .analysis-mode-tabs .btn.active, .analysis-step-tabs .btn.active { color: #fff; border-color: transparent; background: linear-gradient(135deg, #2563eb, #0f766e); }
+    .analysis-context { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 10px 12px; border-left: 4px solid var(--teal); background: #effaf8; margin-bottom: 10px; }
+    .analysis-context strong { color: #10213b; }
+    .data-preview { max-height: 430px; overflow: auto; border: 1px solid var(--line); background: #fff; }
+    .data-preview table { min-width: 760px; font-size: 12px; }
+    .data-preview th { position: sticky; top: 0; z-index: 1; background: #edf3fa; }
+    .data-changed { background: #fff4d6 !important; }
+    .route-steps { display: grid; gap: 8px; }
+    .route-step { display: grid; grid-template-columns: 34px minmax(0,1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); background: #fff; }
+    .route-step .step-no { width: 30px; height: 30px; display: grid; place-items: center; color: #fff; background: #2563eb; font-weight: 800; }
+    .artifact-list { display: grid; gap: 8px; }
+    .artifact-item { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px; align-items: center; padding: 11px 12px; border: 1px solid var(--line); background: #fff; }
+    @media (max-width: 760px) { .route-step, .artifact-item { grid-template-columns: 1fr; } }
     .source-card-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1691,6 +1705,7 @@
     </div>
   </div>
 
+  <script src="vendor/xlsx.full.min.js"></script>
   <script>
     const CLOUD_FUNCTION_URL = "https://1311686407-cg9lh2w33z.ap-guangzhou.tencentscf.com";
     const PDF_SIGN_CACHE_VERSION = "pdfjs-v1";
@@ -2026,6 +2041,7 @@
         hydrateOutlineRecords();
         hydrateMethodWorkspace();
         hydrateCollectionWorkspace();
+        hydrateAnalysisWorkspace();
       }
       setTimeout(showInstallReminder, 600);
     }
@@ -2222,7 +2238,7 @@
       renderOutlineAssistant();
       renderMethodAssistant();
       renderCollectionAssistant();
-      renderStudentAssistant("analysis", analysisSubmodules());
+      renderAnalysisAssistant();
       renderTopicAssistant();
       renderSubmissions();
       renderComments();
@@ -2596,6 +2612,10 @@
       if (moduleId === "collection" && subId === "public") wirePublicTopicStudy();
       if (moduleId === "collection" && subId === "records") wireCollectionRecords();
       if (moduleId === "collection" && subId === "quality") wireCollectionQuality();
+      if (moduleId === "analysis" && subId === "plan") wireAnalysisPlan();
+      if (moduleId === "analysis" && subId === "quant") wireQuantAnalysis();
+      if (moduleId === "analysis" && subId === "text") wireTextAnalysis();
+      if (moduleId === "analysis" && subId === "evidence") wireAnalysisEvidence();
     }
 
     function topicLearnHtml() {
@@ -6748,12 +6768,407 @@ ${limitMethodContext(recent, 5000)}
       ];
     }
 
-    function analysisSubmodules() {
-      return [
-        { id: "clean", label: "数据清洗", what: "检查数据是否可用。", why: "脏数据会导致错误结论。", how: "检查缺失、重复、异常和无效样本。", pitfalls: "不说明删除标准。", output: "数据清洗报告。" },
-        { id: "quant", label: "量化分析", what: "用统计方法回答研究问题。", why: "让数据支撑结论。", how: "描述统计、交叉分析、相关、回归、信效度。", pitfalls: "相关写成因果；过度解释。", output: "统计结果和图表。" },
-        { id: "evidence", label: "证据链", what: "把分析结果对应到研究问题。", why: "论文价值来自证据支持的判断。", how: "每个图表说明回答哪个问题。", pitfalls: "图表很多但没有结论。", output: "证据链说明。" }
-      ];
+    const analysisDatasetRows = new Map();
+    const analysisCleanRows = new Map();
+    const analysisTextContents = new Map();
+
+    function analysisWorkspace() {
+      try {
+        const saved = JSON.parse(getUserStorage("analysisWorkspace", "{}") || "{}");
+        return { datasets: [], textMaterials: [], artifacts: [], quantStep: "task", textStep: "task", quantRoute: "efa", ...saved };
+      } catch (error) {
+        return { datasets: [], textMaterials: [], artifacts: [], quantStep: "task", textStep: "task", quantRoute: "efa" };
+      }
+    }
+
+    function analysisCloudCopy(workspace) {
+      return { ...workspace, datasets: (workspace.datasets || []).map(({ preview, ...item }) => item), textMaterials: (workspace.textMaterials || []).map(({ content, ...item }) => item) };
+    }
+
+    function saveAnalysisWorkspace(patch = {}) {
+      const next = { ...analysisWorkspace(), ...patch };
+      setUserStorage("analysisWorkspace", JSON.stringify(next));
+      syncCloud("saveAnalysisWorkspace", analysisCloudCopy(next));
+      return next;
+    }
+
+    async function hydrateAnalysisWorkspace() {
+      if (currentLoginUser().role !== "student") return;
+      try {
+        const cloud = await callCloudFunction("getAnalysisWorkspace", {});
+        const cloudWorkspace = cloud?.payload || cloud || {};
+        const local = analysisWorkspace();
+        const merged = {
+          ...cloudWorkspace,
+          ...local,
+          datasets: local.datasets?.length ? local.datasets : cloudWorkspace.datasets || [],
+          textMaterials: local.textMaterials?.length ? local.textMaterials : cloudWorkspace.textMaterials || [],
+          artifacts: local.artifacts?.length ? local.artifacts : cloudWorkspace.artifacts || [],
+          cleanReports: { ...(cloudWorkspace.cleanReports || {}), ...(local.cleanReports || {}) },
+          routeOutputs: { ...(cloudWorkspace.routeOutputs || {}), ...(local.routeOutputs || {}) },
+          routeRecords: { ...(cloudWorkspace.routeRecords || {}), ...(local.routeRecords || {}) }
+        };
+        setUserStorage("analysisWorkspace", JSON.stringify(merged));
+        if (document.getElementById("analysis")) renderAnalysisAssistant();
+      } catch (error) {
+        console.warn("analysis workspace sync failed", error);
+      }
+    }
+
+    function analysisResearchContext() {
+      const confirmed = currentConfirmedMethodContext();
+      const topic = confirmed?.topic || project.topic || "";
+      const diagnosis = topicDiagnosisHistory().find((item) => normalizeTopicTitle(item.title) === normalizeTopicTitle(topic)) || {};
+      return {
+        topic,
+        outline: confirmed?.outline || project.outline || "",
+        outlineSource: confirmed?.source || (project.outline ? "当前项目提纲" : "未确认"),
+        methodAdvice: methodOutput("advice") || "",
+        samplingAdvice: methodOutput("sampling") || "",
+        diagnosis: diagnosis.diagnosis || "",
+        writing: diagnosis.basic || "",
+        version: simpleHash(`${topic}|${confirmed?.version || ""}|${confirmed?.outline || project.outline || ""}|${methodOutput("advice") || ""}`)
+      };
+    }
+
+    function analysisContextBar() {
+      const context = analysisResearchContext();
+      return `<div class="analysis-context"><strong>${escapeHtml(context.topic || "尚未确认论文题目")}</strong><span class="tag">提纲：${escapeHtml(context.outlineSource)}</span><span class="tag">方法建议：${context.methodAdvice ? "已生成" : "未生成"}</span><span class="tag">研究方案版本：${escapeHtml(context.version)}</span></div>`;
+    }
+
+    function renderAnalysisAssistant() {
+      document.getElementById("analysis").innerHTML = shellWithSubnav("analysis", "数据分析助手", [
+        ["plan", "研究方案确认"], ["quant", "量化数据分析"], ["text", "文本信息分析"], ["evidence", "证据整合与成果"]
+      ]);
+      setSubContent("analysis", "plan", analysisPlanHtml());
+      bindSubnav("analysis", { plan: analysisPlanHtml, quant: quantAnalysisHtml, text: textAnalysisHtml, evidence: analysisEvidenceHtml });
+    }
+
+    function analysisPlanHtml() {
+      const context = analysisResearchContext();
+      const workspace = analysisWorkspace();
+      const stale = workspace.planVersion && workspace.planVersion !== context.version;
+      return `${analysisContextBar()}
+        <div class="notice ${context.topic ? stale ? "warn" : "ok" : "warn"}">${!context.topic ? "请先在选题、提纲和研究方法模块确认论文方案。" : stale ? "前面的题目、提纲或方法已经变化，当前分析方案属于旧版本，请重新生成并确认。" : workspace.planConfirmed ? "研究方案已经确认，后续数据集和分析成果将绑定该版本。" : "请先把前面的研究内容整理成可执行的数据分析任务。"}</div>
+        <div class="grid" style="margin-top:10px;">
+          <div class="panel span-4"><h3>前面已经确定</h3><div class="result" style="min-height:260px;">题目：${escapeHtml(context.topic || "未确认")}\n\n提纲：${escapeHtml(context.outline ? context.outline.slice(0, 900) : "未确认")}\n\n研究方法：${escapeHtml(context.methodAdvice ? context.methodAdvice.slice(0, 700) : "未生成")}</div></div>
+          <div class="panel span-8"><h3>研究问题—变量—数据—方法任务表</h3><textarea id="analysisPlanOutput" class="coach-output">${escapeHtml(workspace.planText || "点击生成后，AI将从题目、提纲、研究假设、变量、问卷/访谈工具和研究方法中形成分析任务表。")}</textarea><div class="row" style="margin-top:10px;"><button class="btn primary" id="generateAnalysisPlanBtn" type="button" ${context.topic ? "" : "disabled"}>AI生成分析任务表</button><button class="btn" id="confirmAnalysisPlanBtn" type="button" ${workspace.planText ? "" : "disabled"}>确认当前研究方案</button><button class="btn" id="downloadAnalysisPlanBtn" type="button" ${workspace.planText ? "" : "disabled"}>下载任务表</button></div></div>
+        </div>`;
+    }
+
+    function wireAnalysisPlan() {
+      document.getElementById("generateAnalysisPlanBtn")?.addEventListener("click", async () => {
+        const context = analysisResearchContext();
+        const output = document.getElementById("analysisPlanOutput");
+        output.value = "正在把前面的研究方案转化为分析任务...";
+        try {
+          const collection = collectionWorkspace();
+          const content = await callModel(`请把下面本科论文已经形成的研究内容整理成数据分析任务表。\n题目：${context.topic}\n题目诊断：${context.diagnosis || "未提供"}\n提纲：${context.outline || "未确认"}\n研究方法建议：${context.methodAdvice || "未生成"}\n研究对象与抽样：${context.samplingAdvice || "未生成"}\n数据任务：${collection.taskMap || "未生成"}\n研究工具：问卷${methodOutput("tool_questionnaire") ? "已生成" : "未生成"}；访谈提纲${methodOutput("tool_interview") ? "已生成" : "未生成"}；数据收集表${methodOutput("tool_table") ? "已生成" : "未生成"}。\n\n按表格式文本列出：编号｜研究问题或假设｜任务类型（描述/比较/验证/探索）｜变量或文本主题｜所需字段/题项｜数据来源｜建议方法｜用于提纲位置｜预期成果。只列与当前论文有关的任务；指出缺少的变量或数据；不得补造假设。控制在1200字以内。`);
+          output.value = content;
+          saveAnalysisWorkspace({ planText: content, planConfirmed: false, planVersion: context.version });
+          setSubContent("analysis", "plan", analysisPlanHtml());
+        } catch (error) { output.value = `生成失败：${error.message}`; }
+      });
+      document.getElementById("confirmAnalysisPlanBtn")?.addEventListener("click", () => {
+        const context = analysisResearchContext();
+        const text = document.getElementById("analysisPlanOutput")?.value.trim() || "";
+        saveAnalysisWorkspace({ planText: text, planConfirmed: true, planVersion: context.version, planConfirmedAt: new Date().toISOString() });
+        setSubContent("analysis", "plan", analysisPlanHtml());
+      });
+      document.getElementById("downloadAnalysisPlanBtn")?.addEventListener("click", () => downloadWordDoc("数据分析任务表.doc", "数据分析任务表", `<p>${escapeHtml(analysisWorkspace().planText || "").replace(/\n/g, "</p><p>")}</p>`));
+    }
+
+    function quantAnalysisHtml() {
+      const workspace = analysisWorkspace();
+      const steps = [["task", "分析任务"], ["import", "数据导入与识别"], ["clean", "数据清洗"], ["analyze", "分步分析"], ["result", "结果解释与写作"]];
+      const step = steps.some(([id]) => id === workspace.quantStep) ? workspace.quantStep : "task";
+      return `${analysisContextBar()}<div class="analysis-step-tabs">${steps.map(([id, label]) => `<button class="btn ${step === id ? "active" : ""}" type="button" data-quant-step="${id}">${label}</button>`).join("")}</div><div id="quantAnalysisStage">${quantAnalysisStageHtml(step)}</div>`;
+    }
+
+    function quantAnalysisStageHtml(step) {
+      const workspace = analysisWorkspace();
+      const context = analysisResearchContext();
+      if (step === "task") return `<div class="grid"><div class="panel span-8"><h3>这份量化数据要回答什么</h3><p class="hint">系统从已确认的研究方案提供候选任务，学生必须修改或确认；不能只填写“分析问卷”。</p><textarea id="quantTaskText" class="coach-output">${escapeHtml(workspace.quantTask || workspace.planText || "请先在“研究方案确认”中生成任务表，再写明这份数据用于描述、比较、验证或探索什么。")}</textarea><div class="row" style="margin-top:10px;"><button class="btn primary" id="saveQuantTaskBtn" type="button">确认量化分析任务</button><button class="btn" id="downloadQuantTaskBtn" type="button">下载任务卡</button></div></div><div class="panel span-4"><h3>必须确认</h3><div class="check-list"><label class="check"><input type="checkbox" data-quant-task-check>每一行代表什么分析单位</label><label class="check"><input type="checkbox" data-quant-task-check>需要描述、比较、验证或探索什么</label><label class="check"><input type="checkbox" data-quant-task-check>变量与题项如何对应</label><label class="check"><input type="checkbox" data-quant-task-check>结果用于提纲哪个位置</label></div><div class="notice ${workspace.quantTaskConfirmed ? "ok" : "warn"}" style="margin-top:10px;">${workspace.quantTaskConfirmed ? "量化分析任务已确认。" : "确认后再导入数据。"}</div></div></div>`;
+      if (step === "import") return quantImportHtml();
+      if (step === "clean") return quantCleanHtml();
+      if (step === "analyze") return quantRouteHtml();
+      return quantResultHtml();
+    }
+
+    function quantImportHtml() {
+      const workspace = analysisWorkspace();
+      const datasets = workspace.datasets || [];
+      return `<div class="notice">Excel/CSV在当前浏览器本地解析，原始逐行数据默认不上传COS，也不发送给大模型。刷新页面后如需继续查看原始行，请重新选择文件。</div>
+        <div class="grid" style="margin-top:10px;"><div class="panel span-4"><h3>导入原始数据</h3><div class="field"><label>数据集名称</label><input id="analysisDatasetName" placeholder="例如：员工问卷原始数据"></div><div class="field"><label>分析单位</label><input id="analysisDatasetUnit" placeholder="例如：每行一名员工"></div><div class="field"><label>原始文件</label><input id="analysisDatasetFile" type="file" accept=".xlsx,.xls,.csv,.tsv"></div><button class="btn primary" id="importAnalysisDatasetBtn" type="button" ${workspace.quantTaskConfirmed ? "" : "disabled"}>本地识别数据</button><div id="analysisImportStatus" class="notice ${workspace.quantTaskConfirmed ? "" : "warn"}" style="margin-top:10px;">${workspace.quantTaskConfirmed ? "支持多个不同格式的数据集，每份分别建立任务和数据字典。" : "请先返回“分析任务”，确认这份数据要回答什么问题。"}</div></div>
+          <div class="panel span-8"><h3>已登记数据集</h3><div class="table-wrap"><table><thead><tr><th>名称</th><th>文件</th><th>工作表</th><th>记录</th><th>字段</th><th>分析单位</th><th>状态</th><th>操作</th></tr></thead><tbody>${datasets.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.fileName)}</td><td>${escapeHtml(item.sheetName)}</td><td>${item.rowCount}</td><td>${item.columnCount}</td><td>${escapeHtml(item.unit || "待确认")}</td><td>${analysisDatasetRows.has(item.id) ? "当前会话可预览" : "需重新选择原文件"}</td><td><div class="row"><button class="btn" type="button" data-analysis-preview="${item.id}">预览</button><button class="btn" type="button" data-analysis-select="${item.id}">设为当前</button></div></td></tr>`).join("") || `<tr><td colspan="8">尚未导入数据。</td></tr>`}</tbody></table></div></div></div><div id="analysisDatasetPreview" style="margin-top:10px;"></div>`;
+    }
+
+    function makeUniqueHeaders(values) {
+      const used = new Map();
+      return values.map((value, index) => {
+        const base = String(value ?? "").trim() || `字段${index + 1}`;
+        const count = (used.get(base) || 0) + 1; used.set(base, count);
+        return count === 1 ? base : `${base}_${count}`;
+      });
+    }
+
+    function profileRows(headers, rows) {
+      return headers.map((field) => {
+        const values = rows.map((row) => row[field]).filter((value) => value !== "" && value !== null && value !== undefined);
+        const numeric = values.filter((value) => value !== "" && Number.isFinite(Number(value)));
+        return { field, missing: rows.length - values.length, unique: new Set(values.map(String)).size, type: values.length && numeric.length / values.length > .85 ? "数值" : "文本/类别", samples: [...new Set(values.map((value) => String(value).slice(0, 40)))].slice(0, 4) };
+      });
+    }
+
+    async function parseAnalysisFile(file) {
+      if (!window.XLSX) throw new Error("Excel解析组件未加载，请刷新页面后重试");
+      const isDelimited = /\.(csv|tsv)$/i.test(file.name || "");
+      const workbook = isDelimited
+        ? XLSX.read((await file.text()).replace(/^\uFEFF/, ""), { type: "string", cellDates: true, FS: /\.tsv$/i.test(file.name) ? "\t" : "," })
+        : XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
+      const sheetName = workbook.SheetNames[0];
+      const matrix = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: "", raw: false });
+      if (!matrix.length) throw new Error("文件中没有可识别的数据");
+      const candidates = matrix.slice(0, Math.min(10, matrix.length)).map((row, index) => ({ index, score: row.filter((cell) => String(cell).trim()).length }));
+      const headerRow = candidates.sort((a, b) => b.score - a.score || a.index - b.index)[0].index;
+      const headers = makeUniqueHeaders(matrix[headerRow]);
+      const rows = matrix.slice(headerRow + 1).filter((row) => row.some((cell) => String(cell).trim() !== "")).map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index] ?? ""])));
+      return { sheetName, headerRow: headerRow + 1, headers, rows, profile: profileRows(headers, rows) };
+    }
+
+    function dataPreviewHtml(dataset, rows, changed = new Set()) {
+      if (!dataset || !rows?.length) return `<div class="notice warn">当前没有可预览的数据，请重新选择原始文件。</div>`;
+      const headers = dataset.headers || Object.keys(rows[0] || {});
+      return `<div class="panel"><h3>${escapeHtml(dataset.name)}：前${Math.min(30, rows.length)}条预览</h3><div class="data-preview"><table><thead><tr><th>#</th>${headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead><tbody>${rows.slice(0, 30).map((row, ri) => `<tr><td>${ri + 1}</td>${headers.map((h) => `<td class="${changed.has(`${ri}|${h}`) ? "data-changed" : ""}">${escapeHtml(row[h])}</td>`).join("")}</tr>`).join("")}</tbody></table></div></div>`;
+    }
+
+    function datasetDetailHtml(dataset) {
+      if (!dataset) return "";
+      return `<div class="grid" style="margin-top:10px;"><div class="panel span-5"><h3>数据字典概况</h3><div class="table-wrap" style="max-height:330px;"><table><thead><tr><th>字段</th><th>类型</th><th>缺失</th><th>示例</th></tr></thead><tbody>${(dataset.profile || []).map((item) => `<tr><td>${escapeHtml(item.field)}</td><td>${item.type}</td><td>${item.missing}</td><td>${escapeHtml(item.samples.join("、"))}</td></tr>`).join("")}</tbody></table></div><button class="btn" style="margin-top:10px;" data-download-dictionary="${dataset.id}" type="button">下载数据字典CSV</button></div><div class="panel span-7"><h3>前面变量与当前字段匹配</h3><textarea id="datasetMappingOutput" class="coach-output">${escapeHtml(dataset.mappingText || "AI将根据前面确定的研究问题、变量、量表和当前字段，指出哪些字段可以支持哪些任务，哪些变量缺失。")}</textarea><div class="row" style="margin-top:10px;"><button class="btn primary" data-generate-dataset-mapping="${dataset.id}" type="button">AI匹配变量与字段</button><button class="btn" data-save-dataset-mapping="${dataset.id}" type="button">确认字段映射</button></div></div></div>`;
+    }
+
+    function wireQuantAnalysis() {
+      document.querySelectorAll("[data-quant-step]").forEach((button) => button.addEventListener("click", () => { saveAnalysisWorkspace({ quantStep: button.dataset.quantStep }); setSubContent("analysis", "quant", quantAnalysisHtml()); }));
+      document.getElementById("saveQuantTaskBtn")?.addEventListener("click", () => {
+        const checked = document.querySelectorAll("[data-quant-task-check]:checked").length;
+        const text = document.getElementById("quantTaskText")?.value.trim() || "";
+        if (checked < 4) return alert("请先确认右侧四项研究任务信息。");
+        saveAnalysisWorkspace({ quantTask: text, quantTaskConfirmed: true }); setSubContent("analysis", "quant", quantAnalysisHtml());
+      });
+      document.getElementById("downloadQuantTaskBtn")?.addEventListener("click", () => downloadWordDoc("量化分析任务卡.doc", "量化分析任务卡", `<p>${escapeHtml(document.getElementById("quantTaskText")?.value || "").replace(/\n/g, "</p><p>")}</p>`));
+      document.getElementById("importAnalysisDatasetBtn")?.addEventListener("click", async () => {
+        const file = document.getElementById("analysisDatasetFile")?.files?.[0];
+        const status = document.getElementById("analysisImportStatus");
+        if (!file) { status.className = "notice warn"; status.textContent = "请选择Excel或CSV文件。"; return; }
+        status.className = "notice"; status.textContent = "正在浏览器本地识别表头、字段和记录...";
+        try {
+          const parsed = await parseAnalysisFile(file);
+          const id = `dataset-${Date.now()}`;
+          const dataset = { id, name: document.getElementById("analysisDatasetName").value.trim() || file.name.replace(/\.[^.]+$/, ""), fileName: file.name, unit: document.getElementById("analysisDatasetUnit").value.trim(), sheetName: parsed.sheetName, headerRow: parsed.headerRow, rowCount: parsed.rows.length, columnCount: parsed.headers.length, headers: parsed.headers, profile: parsed.profile, importedAt: new Date().toISOString(), task: analysisWorkspace().quantTask || "" };
+          analysisDatasetRows.set(id, parsed.rows);
+          saveAnalysisWorkspace({ datasets: [dataset, ...(analysisWorkspace().datasets || [])], activeDatasetId: id });
+          setSubContent("analysis", "quant", quantAnalysisHtml());
+        } catch (error) { status.className = "notice warn"; status.textContent = `识别失败：${error.message}`; }
+      });
+      document.querySelectorAll("[data-analysis-preview]").forEach((button) => button.addEventListener("click", () => {
+        const dataset = (analysisWorkspace().datasets || []).find((item) => item.id === button.dataset.analysisPreview);
+        document.getElementById("analysisDatasetPreview").innerHTML = dataPreviewHtml(dataset, analysisDatasetRows.get(dataset?.id)) + datasetDetailHtml(dataset);
+        wireDatasetDetail(dataset);
+      }));
+      document.querySelectorAll("[data-analysis-select]").forEach((button) => button.addEventListener("click", () => { saveAnalysisWorkspace({ activeDatasetId: button.dataset.analysisSelect }); setSubContent("analysis", "quant", quantAnalysisHtml()); }));
+      wireQuantCleaning();
+      wireQuantRoute();
+      wireQuantResult();
+    }
+
+    function wireDatasetDetail(dataset) {
+      document.querySelector(`[data-download-dictionary="${dataset.id}"]`)?.addEventListener("click", () => {
+        const rows = [["字段", "识别类型", "缺失数量", "唯一值数量", "示例"], ...(dataset.profile || []).map((item) => [item.field, item.type, item.missing, item.unique, item.samples.join("；")])];
+        downloadTextFile(`${dataset.name}-数据字典.csv`, rows.map((row) => row.map(csvCell).join(",")).join("\r\n"), "text/csv;charset=utf-8");
+      });
+      document.querySelector(`[data-generate-dataset-mapping="${dataset.id}"]`)?.addEventListener("click", async () => {
+        const box = document.getElementById("datasetMappingOutput"); box.value = "正在对照前面变量、假设和当前字段...";
+        try { box.value = await callModel(`题目：${analysisResearchContext().topic}\n提纲：${analysisResearchContext().outline}\n研究方法：${analysisResearchContext().methodAdvice}\n分析任务表：${analysisWorkspace().quantTask || analysisWorkspace().planText}\n当前数据字段：${JSON.stringify(dataset.profile)}\n\n请形成字段映射表：研究问题/假设｜前面确定的变量或概念｜当前字段/题项｜变量角色｜必要处理（编码、反向计分、维度合成等）｜是否足以分析｜缺失信息。不能仅凭字段名臆测量表归属；需要问卷或计分规则时明确要求学生核对。`); } catch (error) { box.value = `生成失败：${error.message}`; }
+      });
+      document.querySelector(`[data-save-dataset-mapping="${dataset.id}"]`)?.addEventListener("click", () => {
+        const datasets = analysisWorkspace().datasets.map((item) => item.id === dataset.id ? { ...item, mappingText: document.getElementById("datasetMappingOutput")?.value || "", mappingConfirmed: true } : item);
+        saveAnalysisWorkspace({ datasets }); alert("字段映射已确认。");
+      });
+    }
+
+    function activeAnalysisDataset() {
+      const workspace = analysisWorkspace();
+      return (workspace.datasets || []).find((item) => item.id === workspace.activeDatasetId) || (workspace.datasets || [])[0] || null;
+    }
+
+    function quantCleanHtml() {
+      const workspace = analysisWorkspace();
+      const dataset = activeAnalysisDataset();
+      const rows = dataset ? analysisDatasetRows.get(dataset.id) : null;
+      const cleaned = dataset ? analysisCleanRows.get(dataset.id) : null;
+      const report = workspace.cleanReports?.[dataset?.id] || "";
+      return `<div class="row" style="margin-bottom:10px;"><div class="field" style="min-width:280px; margin:0;"><label>当前数据集</label><select id="cleanDatasetSelect">${(workspace.datasets || []).map((item) => `<option value="${item.id}" ${item.id === dataset?.id ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}</select></div><div class="notice ${dataset ? rows ? "ok" : "warn" : "warn"}" style="flex:1; margin:0;">${dataset ? rows ? `原始数据保留不变；当前处理：${escapeHtml(dataset.name)}。` : "该数据集的原始文件不在当前会话中，请返回“数据导入与识别”重新选择文件。" : "请先导入量化数据。"}</div></div>
+        ${dataset ? `<div class="grid" style="margin-top:10px;"><div class="panel span-4"><h3>字段质量概况</h3><div class="table-wrap" style="max-height:430px;"><table><thead><tr><th>字段</th><th>类型</th><th>缺失</th><th>唯一值</th></tr></thead><tbody>${(dataset.profile || []).map((item) => `<tr><td>${escapeHtml(item.field)}</td><td>${item.type}</td><td>${item.missing}</td><td>${item.unique}</td></tr>`).join("")}</tbody></table></div></div><div class="panel span-8"><h3>个性化清洗建议与记录</h3><textarea id="analysisCleanAdvice" class="coach-output">${escapeHtml(report || "AI将结合研究任务、字段概况和后续分析方法提出清洗建议。程序只自动执行去除完全空白行、文本首尾空格和完全重复记录；其余删除、插补、反向计分必须由学生确认后另行处理。")}</textarea><div class="row" style="margin-top:10px;"><button class="btn primary" id="generateCleanAdviceBtn" type="button" ${rows ? "" : "disabled"}>AI生成清洗建议</button><button class="btn" id="runSafeCleanBtn" type="button" ${rows ? "" : "disabled"}>生成基础清洗版本</button><button class="btn" id="downloadCleanDataBtn" type="button" ${cleaned ? "" : "disabled"}>下载清洗后Excel</button><button class="btn" id="downloadCleanReportBtn" type="button" ${report ? "" : "disabled"}>下载清洗报告</button></div></div></div><div id="analysisCleanPreview" style="margin-top:10px;">${dataPreviewHtml(dataset, cleaned || rows)}</div>` : ""}`;
+    }
+
+    function safeCleanRows(rows, headers) {
+      const changed = new Set(); const seen = new Set(); const output = []; let duplicates = 0; let trimmed = 0;
+      rows.forEach((source, sourceIndex) => {
+        const row = {};
+        headers.forEach((header) => { const value = source[header]; const next = typeof value === "string" ? value.trim() : value; row[header] = next; if (next !== value) { changed.add(`${output.length}|${header}`); trimmed++; } });
+        const key = JSON.stringify(row);
+        if (seen.has(key)) { duplicates++; return; }
+        seen.add(key); output.push(row);
+      });
+      return { rows: output, changed, summary: `原始记录：${rows.length}条\n清洗后记录：${output.length}条\n删除完全重复记录：${duplicates}条\n清理文本首尾空格：${trimmed}个单元格\n未自动删除缺失值、异常值或疑似无效问卷；未自动进行插补、反向计分和量表合成。` };
+    }
+
+    function wireQuantCleaning() {
+      document.getElementById("cleanDatasetSelect")?.addEventListener("change", (event) => { saveAnalysisWorkspace({ activeDatasetId: event.target.value }); setSubContent("analysis", "quant", quantAnalysisHtml()); });
+      document.getElementById("generateCleanAdviceBtn")?.addEventListener("click", async () => {
+        const dataset = activeAnalysisDataset(); const box = document.getElementById("analysisCleanAdvice");
+        box.value = "正在结合研究任务和字段概况提出清洗建议...";
+        try {
+          const content = await callModel(`题目：${analysisResearchContext().topic}\n分析任务：${analysisWorkspace().quantTask || analysisWorkspace().planText || "未确认"}\n数据集：${dataset.name}；分析单位：${dataset.unit || "待确认"}；记录${dataset.rowCount}行；字段${dataset.columnCount}列。\n字段概况：${JSON.stringify(dataset.profile)}\n后续路线：${analysisWorkspace().quantRoute === "relation" ? "变量关系验证" : "探索性因子分析"}\n\n请逐项给出个性化数据清洗建议，每项必须包含“发现、为什么可能是问题、建议处理、对论文或后续分析的影响”。重点检查表头、编码、身份信息、缺失、重复、异常、反向题、无效问卷、多选题、变量合成和样本偏差。不得看到字段名就擅自断定删除；需要量表计分规则时明确要求学生核对原量表。控制在1200字以内。`);
+          const reports = { ...(analysisWorkspace().cleanReports || {}), [dataset.id]: content };
+          saveAnalysisWorkspace({ cleanReports: reports }); box.value = content;
+        } catch (error) { box.value = `生成失败：${error.message}`; }
+      });
+      document.getElementById("runSafeCleanBtn")?.addEventListener("click", () => {
+        const dataset = activeAnalysisDataset(); const rows = analysisDatasetRows.get(dataset?.id); if (!dataset || !rows) return;
+        const cleaned = safeCleanRows(rows, dataset.headers); analysisCleanRows.set(dataset.id, cleaned.rows);
+        const reports = { ...(analysisWorkspace().cleanReports || {}), [dataset.id]: `${cleaned.summary}\n\nAI/人工清洗建议：\n${document.getElementById("analysisCleanAdvice")?.value || "未生成"}` };
+        const datasets = analysisWorkspace().datasets.map((item) => item.id === dataset.id ? { ...item, cleanedRowCount: cleaned.rows.length, cleanVersion: `V${Number(item.cleanVersion?.slice(1) || 0) + 1}`, cleanSummary: cleaned.summary } : item);
+        saveAnalysisWorkspace({ datasets, cleanReports: reports });
+        setSubContent("analysis", "quant", quantAnalysisHtml());
+        document.getElementById("analysisCleanPreview").innerHTML = dataPreviewHtml(dataset, cleaned.rows, cleaned.changed);
+      });
+      document.getElementById("downloadCleanDataBtn")?.addEventListener("click", () => {
+        const dataset = activeAnalysisDataset(); const rows = analysisCleanRows.get(dataset?.id); if (!rows?.length) return;
+        const sheet = XLSX.utils.json_to_sheet(rows, { header: dataset.headers }); const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, "清洗后数据"); XLSX.writeFile(book, `${dataset.name}-清洗后数据.xlsx`);
+      });
+      document.getElementById("downloadCleanReportBtn")?.addEventListener("click", () => { const dataset = activeAnalysisDataset(); downloadWordDoc(`${dataset?.name || "数据"}-清洗报告.doc`, "数据清洗报告", `<p>${escapeHtml(analysisWorkspace().cleanReports?.[dataset?.id] || "").replace(/\n/g, "</p><p>")}</p>`); });
+    }
+
+    const quantRouteSteps = {
+      efa: ["题项与样本检查", "KMO与Bartlett检验", "因子提取方法", "因子数量判断", "因子旋转", "载荷与题项处理", "因子命名与结构解释", "各因子信度", "形成探索性模型"],
+      relation: ["样本结构与有效样本", "量表计分与变量生成", "信度与测量质量", "共同方法偏差", "描述统计", "相关分析", "回归分析", "中介或调节效应", "分组与稳健性检验", "假设检验汇总"]
+    };
+
+    function quantRouteHtml() {
+      const workspace = analysisWorkspace(); const route = workspace.quantRoute === "relation" ? "relation" : "efa"; const dataset = activeAnalysisDataset(); const key = `${route}-${workspace.routeStepIndex || 0}`; const record = workspace.routeRecords?.[key] || {};
+      return `<div class="analysis-mode-tabs"><button class="btn ${route === "efa" ? "active" : ""}" data-quant-route="efa" type="button">探索性因子分析路线</button><button class="btn ${route === "relation" ? "active" : ""}" data-quant-route="relation" type="button">变量关系验证路线</button></div><div class="notice">系统根据前面确认的变量、假设、提纲和当前数据字段生成步骤。没有中介或调节变量时，不应机械开展相应分析。</div><div class="grid" style="margin-top:10px;"><div class="panel span-5"><h3>${route === "efa" ? "探索性因子分析" : "变量关系验证"}步骤</h3><div class="route-steps">${quantRouteSteps[route].map((label, index) => `<div class="route-step"><span class="step-no">${index + 1}</span><strong>${label}</strong><button class="btn" type="button" data-route-step-index="${index}">查看指导</button></div>`).join("")}</div></div><div class="panel span-7"><h3>第一步：导师操作指导</h3><textarea id="quantRouteOutput" class="coach-output" style="min-height:250px;">${escapeHtml(workspace.routeOutputs?.[key] || `请选择左侧步骤。系统将说明：为什么做、SPSSAU操作路径、需要读取的指标、学生需要作出的判断、可写入论文的内容和常见误区。\n\n当前数据集：${dataset?.name || "未导入"}`)}</textarea><button class="btn primary" id="generateRouteGuideBtn" style="margin-top:8px;" type="button" ${dataset ? "" : "disabled"}>AI生成当前步骤指导</button><h3 style="margin-top:14px;">第二步：粘贴软件结果</h3><textarea id="quantSoftwareResult" style="min-height:130px;" placeholder="粘贴SPSSAU/SPSS输出中的关键表格或指标；请保留样本量、系数、显著性和模型信息。">${escapeHtml(record.softwareResult || "")}</textarea><h3 style="margin-top:14px;">第三步：写下你的判断</h3><textarea id="quantStudentJudgment" style="min-height:100px;" placeholder="请先由你判断：结果说明什么？回答了哪个问题？能否支持假设？">${escapeHtml(record.studentJudgment || "")}</textarea><h3 style="margin-top:14px;">AI导师反馈</h3><textarea id="quantTutorFeedback" class="coach-output" style="min-height:180px;">${escapeHtml(record.tutorFeedback || "等待学生提交软件结果和自己的判断。")}</textarea><div class="row" style="margin-top:10px;"><button class="btn primary" id="checkRouteResultBtn" type="button">AI检查你的解释</button><button class="btn" id="saveRouteResultBtn" type="button">保存当前成果</button><button class="btn" id="downloadRouteResultBtn" type="button">下载当前成果</button></div></div></div>`;
+    }
+
+    function wireQuantRoute() {
+      document.querySelectorAll("[data-quant-route]").forEach((button) => button.addEventListener("click", () => { saveAnalysisWorkspace({ quantRoute: button.dataset.quantRoute, routeStepIndex: 0 }); setSubContent("analysis", "quant", quantAnalysisHtml()); }));
+      document.querySelectorAll("[data-route-step-index]").forEach((button) => button.addEventListener("click", () => { saveAnalysisWorkspace({ routeStepIndex: Number(button.dataset.routeStepIndex) }); setSubContent("analysis", "quant", quantAnalysisHtml()); }));
+      document.getElementById("generateRouteGuideBtn")?.addEventListener("click", async () => {
+        const workspace = analysisWorkspace(); const route = workspace.quantRoute === "relation" ? "relation" : "efa"; const index = Number(workspace.routeStepIndex || 0); const stepName = quantRouteSteps[route][index]; const dataset = activeAnalysisDataset(); const box = document.getElementById("quantRouteOutput"); box.value = "正在生成与当前论文和字段匹配的分步指导...";
+        try {
+          const content = await callModel(`题目：${analysisResearchContext().topic}\n提纲：${analysisResearchContext().outline}\n研究方法：${analysisResearchContext().methodAdvice || "未生成"}\n量化任务：${workspace.quantTask || workspace.planText || "未确认"}\n当前路线：${route === "efa" ? "探索性因子分析" : "变量关系验证"}\n当前步骤：${stepName}\n数据集：${dataset.name}，${dataset.rowCount}行，字段概况：${JSON.stringify(dataset.profile)}\n清洗记录：${workspace.cleanReports?.[dataset.id] || "未完成"}\n\n请给出：1.本步回答什么问题；2.开展本步的前提；3.SPSSAU中的具体操作路径和变量放置方法；4.必须读取的指标及判断规则；5.学生需要填写的判断；6.结果如何对应研究问题和提纲；7.常见错误；8.需要保存的表格/图形。不得编造学生尚未计算的统计值。控制在1000字以内。`);
+          const outputs = { ...(analysisWorkspace().routeOutputs || {}), [`${route}-${index}`]: content }; saveAnalysisWorkspace({ routeOutputs: outputs }); box.value = content;
+        } catch (error) { box.value = `生成失败：${error.message}`; }
+      });
+      document.getElementById("checkRouteResultBtn")?.addEventListener("click", async () => {
+        const workspace = analysisWorkspace(); const route = workspace.quantRoute === "relation" ? "relation" : "efa"; const index = Number(workspace.routeStepIndex || 0); const key = `${route}-${index}`; const softwareResult = document.getElementById("quantSoftwareResult")?.value.trim() || ""; const studentJudgment = document.getElementById("quantStudentJudgment")?.value.trim() || ""; const box = document.getElementById("quantTutorFeedback");
+        if (!softwareResult || !studentJudgment) return alert("请先粘贴软件结果，并写下你自己的判断。"); box.value = "正在检查指标读取、推断边界和研究问题对应关系...";
+        try { const feedback = await callModel(`题目：${analysisResearchContext().topic}\n研究任务：${workspace.quantTask || workspace.planText}\n当前步骤：${quantRouteSteps[route][index]}\n操作指导：${workspace.routeOutputs?.[key] || "未生成"}\n软件结果：${softwareResult}\n学生判断：${studentJudgment}\n\n请以导师口吻简洁检查：1.关键指标是否读对；2.学生判断是否准确；3.是否把相关写成因果或过度推断；4.结果回答哪个研究问题/假设；5.建议如何修改；6.可写入论文的一段规范表述。不得修改或补造软件结果中的数字。控制在800字以内。`); const records = { ...(analysisWorkspace().routeRecords || {}), [key]: { softwareResult, studentJudgment, tutorFeedback: feedback, checkedAt: new Date().toISOString() } }; saveAnalysisWorkspace({ routeRecords: records }); box.value = feedback; } catch (error) { box.value = `检查失败：${error.message}`; }
+      });
+      document.getElementById("saveRouteResultBtn")?.addEventListener("click", () => {
+        const workspace = analysisWorkspace(); const route = workspace.quantRoute === "relation" ? "relation" : "efa"; const index = Number(workspace.routeStepIndex || 0); const title = `${route === "efa" ? "探索性因子分析" : "变量关系验证"}-${quantRouteSteps[route][index]}`; const content = `操作指导：\n${document.getElementById("quantRouteOutput")?.value || ""}\n\n软件结果：\n${document.getElementById("quantSoftwareResult")?.value || ""}\n\n学生判断：\n${document.getElementById("quantStudentJudgment")?.value || ""}\n\nAI导师反馈：\n${document.getElementById("quantTutorFeedback")?.value || ""}`;
+        saveAnalysisArtifact(title, "量化分析", content); alert("当前成果已保存到成果中心。");
+      });
+      document.getElementById("downloadRouteResultBtn")?.addEventListener("click", () => { const workspace = analysisWorkspace(); const route = workspace.quantRoute === "relation" ? "relation" : "efa"; const index = Number(workspace.routeStepIndex || 0); const content = `操作指导：\n${document.getElementById("quantRouteOutput")?.value || ""}\n\n软件结果：\n${document.getElementById("quantSoftwareResult")?.value || ""}\n\n学生判断：\n${document.getElementById("quantStudentJudgment")?.value || ""}\n\nAI导师反馈：\n${document.getElementById("quantTutorFeedback")?.value || ""}`; downloadWordDoc(`${quantRouteSteps[route][index]}.doc`, quantRouteSteps[route][index], `<p>${escapeHtml(content).replace(/\n/g, "</p><p>")}</p>`); });
+    }
+
+    function quantResultHtml() {
+      const workspace = analysisWorkspace();
+      return `<div class="grid"><div class="panel span-5"><h3>已保存量化成果</h3><div class="artifact-list">${(workspace.artifacts || []).filter((item) => item.type === "量化分析").map((item) => `<div class="artifact-item"><div><strong>${escapeHtml(item.title)}</strong><p class="hint">${escapeHtml(item.createdAt)}</p></div><button class="btn" data-artifact-preview="${item.id}" type="button">预览</button></div>`).join("") || `<div class="notice">尚未保存量化分析成果。</div>`}</div></div><div class="panel span-7"><h3>结果解释与论文写作</h3><textarea id="quantWriteOutput" class="coach-output">${escapeHtml(workspace.quantWrite || "系统将综合已确认的研究问题、变量、清洗报告和保存的统计成果，检查能支持什么结论、哪些结论不能推出，并组织论文式表述。")}</textarea><div class="row" style="margin-top:10px;"><button class="btn primary" id="generateQuantWriteBtn" type="button">AI生成结果解释</button><button class="btn" id="downloadQuantWriteBtn" type="button" ${workspace.quantWrite ? "" : "disabled"}>下载Word</button></div></div></div><div id="analysisArtifactPreview" style="margin-top:10px;"></div>`;
+    }
+
+    function wireQuantResult() {
+      document.querySelectorAll("[data-artifact-preview]").forEach((button) => button.addEventListener("click", () => { const item = (analysisWorkspace().artifacts || []).find((entry) => entry.id === button.dataset.artifactPreview); document.getElementById("analysisArtifactPreview").innerHTML = `<div class="panel"><h3>${escapeHtml(item?.title || "成果")}</h3><div class="result">${escapeHtml(item?.content || "")}</div></div>`; }));
+      document.getElementById("generateQuantWriteBtn")?.addEventListener("click", async () => { const box = document.getElementById("quantWriteOutput"); box.value = "正在检查统计成果与研究问题的对应关系..."; try { const workspace = analysisWorkspace(); const content = await callModel(`题目：${analysisResearchContext().topic}\n提纲：${analysisResearchContext().outline}\n分析任务：${workspace.quantTask || workspace.planText || "未确认"}\n清洗报告：${Object.values(workspace.cleanReports || {}).join("\n")}\n已保存统计成果：${(workspace.artifacts || []).filter((item) => item.type === "量化分析").map((item) => `${item.title}\n${item.content}`).join("\n\n")}\n\n请按论文结果部分的口吻整理：样本与数据处理、各分析步骤的主要结果、对应研究问题或假设、能支持的结论、不能推出的结论、需要与文献和文本材料讨论的地方。没有具体统计值时不得补造。控制在1500字以内。`); saveAnalysisWorkspace({ quantWrite: content }); box.value = content; } catch (error) { box.value = `生成失败：${error.message}`; } });
+      document.getElementById("downloadQuantWriteBtn")?.addEventListener("click", () => downloadWordDoc("量化分析结果.doc", "量化分析结果", `<p>${escapeHtml(analysisWorkspace().quantWrite || "").replace(/\n/g, "</p><p>")}</p>`));
+    }
+
+    function textAnalysisHtml() {
+      const workspace = analysisWorkspace(); const steps = [["task", "分析任务"], ["import", "材料导入与整理"], ["code", "初步编码"], ["theme", "主题与关系分析"], ["write", "结果验证与写作"]]; const step = steps.some(([id]) => id === workspace.textStep) ? workspace.textStep : "task";
+      return `${analysisContextBar()}<div class="analysis-step-tabs">${steps.map(([id, label]) => `<button class="btn ${step === id ? "active" : ""}" type="button" data-text-step="${id}">${label}</button>`).join("")}</div><div id="textAnalysisStage">${textAnalysisStageHtml(step)}</div>`;
+    }
+
+    function textAnalysisStageHtml(step) {
+      const workspace = analysisWorkspace();
+      if (step === "task") return `<div class="grid"><div class="panel span-8"><h3>文本材料要回答什么</h3><textarea id="textTaskText" class="coach-output">${escapeHtml(workspace.textTask || workspace.planText || "请明确访谈、开放式回答、企业文件或观察记录用于识别问题、解释原因、发现机制、比较群体，还是解释量化结果。")}</textarea><div class="row" style="margin-top:10px;"><button class="btn primary" id="saveTextTaskBtn" type="button">确认文本分析任务</button><button class="btn" id="downloadTextTaskBtn" type="button">下载任务卡</button></div></div><div class="panel span-4"><h3>本模块不重复处理</h3><p class="hint">数据获取助手中的网络公开话题研究已有专门的搜索、伦理、编码和写入论文流程。本模块主要处理访谈逐字稿、开放回答、企业文件、会议记录和观察材料。</p></div></div>`;
+      if (step === "import") return textImportHtml();
+      if (step === "code") return textCodingHtml();
+      if (step === "theme") return textThemeHtml();
+      return textWriteHtml();
+    }
+
+    function textImportHtml() {
+      const workspace = analysisWorkspace();
+      return `<div class="notice warn">导入前请删除姓名、手机号、微信号、身份证号和可识别的企业敏感信息。文本默认仅保存在当前浏览器会话；点击AI分析时，选中的匿名文本会发送给当前学生自行接入的大模型。</div><div class="grid" style="margin-top:10px;"><div class="panel span-5"><h3>导入一份文本材料</h3><div class="field"><label>材料名称</label><input id="textMaterialName" placeholder="例如：离职员工访谈01"></div><div class="field"><label>材料类型</label><select id="textMaterialType"><option>访谈逐字稿</option><option>开放式问卷回答</option><option>企业内部文件</option><option>会议记录</option><option>观察记录</option><option>其他文本</option></select></div><div class="field"><label>对象类别</label><input id="textMaterialGroup" placeholder="例如：已离职员工、在职员工、管理者"></div><div class="field"><label>对应研究问题</label><input id="textMaterialQuestion" value="${escapeHtml(workspace.textTask || "")}" placeholder="这份材料用于回答什么"></div><div class="field"><label>TXT/CSV文件（可选）</label><input id="textMaterialFile" type="file" accept=".txt,.csv,.tsv"></div><div class="field"><label>匿名文本</label><textarea id="textMaterialContent" style="min-height:220px;" placeholder="粘贴匿名化后的访谈、开放回答或文件内容"></textarea></div><button class="btn primary" id="saveTextMaterialBtn" type="button">确认并加入材料库</button></div><div class="panel span-7"><h3>材料库</h3><div class="table-wrap"><table><thead><tr><th>编号</th><th>名称</th><th>类型</th><th>对象</th><th>字符数</th><th>研究问题</th><th>操作</th></tr></thead><tbody>${(workspace.textMaterials || []).map((item) => `<tr><td>${escapeHtml(item.sourceNo)}</td><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.type)}</td><td>${escapeHtml(item.group)}</td><td>${item.length}</td><td>${escapeHtml(item.question)}</td><td><button class="btn" data-text-preview="${item.id}" type="button">预览</button></td></tr>`).join("") || `<tr><td colspan="7">尚未导入文本材料。</td></tr>`}</tbody></table></div><div id="textMaterialPreview" style="margin-top:10px;"></div></div></div>`;
+    }
+
+    function textCodingHtml() {
+      const workspace = analysisWorkspace();
+      return `<div class="grid"><div class="panel span-4"><h3>选择材料</h3><div class="check-list">${(workspace.textMaterials || []).map((item) => `<label class="check"><input type="checkbox" data-text-code-select value="${item.id}">${escapeHtml(item.sourceNo)}｜${escapeHtml(item.name)}</label>`).join("") || `<div class="notice">请先导入材料。</div>`}</div></div><div class="panel span-8"><h3>AI初步编码与学生复核</h3><textarea id="textCodingOutput" class="coach-output">${escapeHtml(workspace.textCoding || "选择材料后，AI将按“原文片段—初步标签—所属主题—支持的研究问题—证据强度”提出编码建议。学生需要修改、合并、新增或删除标签。")}</textarea><div class="row" style="margin-top:10px;"><button class="btn primary" id="generateTextCodingBtn" type="button">AI生成初步编码</button><button class="btn" id="saveTextCodingBtn" type="button">确认编码版本</button><button class="btn" id="downloadTextCodingBtn" type="button">下载编码结果</button></div></div></div>`;
+    }
+
+    function textThemeHtml() {
+      const workspace = analysisWorkspace();
+      return `<div class="grid"><div class="panel span-4"><h3>分析重点</h3><div class="check-list">${["主要问题类型", "原因与机制", "行为与结果", "不同对象观点差异", "反面案例", "证据强弱", "与量化结果的联系"].map((item) => `<label class="check"><input type="checkbox" data-theme-focus value="${item}" checked>${item}</label>`).join("")}</div></div><div class="panel span-8"><h3>主题与关系分析</h3><textarea id="textThemeOutput" class="coach-output">${escapeHtml(workspace.textThemes || "系统将基于学生确认后的编码，分析主题、对象差异、问题—原因—结果关系和反面案例，不以简单词频替代语境分析。")}</textarea><div class="row" style="margin-top:10px;"><button class="btn primary" id="generateTextThemeBtn" type="button" ${workspace.textCoding ? "" : "disabled"}>AI分析主题关系</button><button class="btn" id="saveTextThemeBtn" type="button">保存当前成果</button><button class="btn" id="downloadTextThemeBtn" type="button">下载成果</button></div></div></div>`;
+    }
+
+    function textWriteHtml() {
+      const workspace = analysisWorkspace();
+      return `<div class="panel"><h3>文本结果验证与写入论文</h3><p class="hint">系统将说明材料来源、对象构成、筛选和编码方法、主要主题、代表性匿名证据、不同群体差异、与量化结果的关系及研究局限。</p><textarea id="textWriteOutput" class="coach-output">${escapeHtml(workspace.textWrite || "等待生成。")}</textarea><div class="row" style="margin-top:10px;"><button class="btn primary" id="generateTextWriteBtn" type="button" ${workspace.textThemes ? "" : "disabled"}>AI生成论文式文本分析</button><button class="btn" id="downloadTextWriteBtn" type="button" ${workspace.textWrite ? "" : "disabled"}>下载Word</button></div></div>`;
+    }
+
+    function wireTextAnalysis() {
+      document.querySelectorAll("[data-text-step]").forEach((button) => button.addEventListener("click", () => { saveAnalysisWorkspace({ textStep: button.dataset.textStep }); setSubContent("analysis", "text", textAnalysisHtml()); }));
+      document.getElementById("saveTextTaskBtn")?.addEventListener("click", () => { saveAnalysisWorkspace({ textTask: document.getElementById("textTaskText")?.value.trim() || "", textTaskConfirmed: true }); setSubContent("analysis", "text", textAnalysisHtml()); });
+      document.getElementById("downloadTextTaskBtn")?.addEventListener("click", () => downloadWordDoc("文本分析任务卡.doc", "文本分析任务卡", `<p>${escapeHtml(document.getElementById("textTaskText")?.value || "").replace(/\n/g, "</p><p>")}</p>`));
+      document.getElementById("textMaterialFile")?.addEventListener("change", async (event) => { const file = event.target.files?.[0]; if (file) document.getElementById("textMaterialContent").value = await file.text(); });
+      document.getElementById("saveTextMaterialBtn")?.addEventListener("click", () => {
+        const content = document.getElementById("textMaterialContent")?.value.trim() || ""; if (!content) return alert("请粘贴或选择匿名文本材料。");
+        const workspace = analysisWorkspace(); const id = `text-${Date.now()}`; const item = { id, sourceNo: `TXT${String((workspace.textMaterials || []).length + 1).padStart(3, "0")}`, name: document.getElementById("textMaterialName").value.trim() || "未命名文本", type: document.getElementById("textMaterialType").value, group: document.getElementById("textMaterialGroup").value.trim() || "待确认", question: document.getElementById("textMaterialQuestion").value.trim() || workspace.textTask || "待确认", length: content.length, importedAt: new Date().toISOString() };
+        analysisTextContents.set(id, content); saveAnalysisWorkspace({ textMaterials: [item, ...(workspace.textMaterials || [])] }); setSubContent("analysis", "text", textAnalysisHtml());
+      });
+      document.querySelectorAll("[data-text-preview]").forEach((button) => button.addEventListener("click", () => { const item = (analysisWorkspace().textMaterials || []).find((entry) => entry.id === button.dataset.textPreview); const content = analysisTextContents.get(item?.id); document.getElementById("textMaterialPreview").innerHTML = `<div class="notice ${content ? "" : "warn"}">${content ? `<strong>${escapeHtml(item.sourceNo)}｜${escapeHtml(item.name)}</strong><div class="result" style="margin-top:8px; max-height:260px; overflow:auto;">${escapeHtml(content.slice(0, 8000))}</div>` : "当前会话中没有原文，请重新导入该材料。"}</div>`; }));
+      document.getElementById("generateTextCodingBtn")?.addEventListener("click", async () => {
+        const ids = [...document.querySelectorAll("[data-text-code-select]:checked")].map((input) => input.value); const box = document.getElementById("textCodingOutput"); if (!ids.length) return alert("请至少选择一份材料。");
+        const selected = ids.map((id) => { const meta = (analysisWorkspace().textMaterials || []).find((item) => item.id === id); return `${meta?.sourceNo}｜${meta?.group}｜${meta?.question}\n${(analysisTextContents.get(id) || "").slice(0, 6000)}`; }).join("\n\n");
+        if (!selected.trim()) return alert("当前会话缺少原文，请重新导入后再编码。"); box.value = "正在按研究问题生成初步编码...";
+        try { const content = await callModel(`题目：${analysisResearchContext().topic}\n提纲：${analysisResearchContext().outline}\n文本分析任务：${analysisWorkspace().textTask || "未确认"}\n材料：\n${selected}\n\n请按材料编号逐条提出初步编码：原文短片段｜初步标签｜所属主题｜支持的研究问题｜证据强度｜是否存在其他解释。最后给出待学生复核的问题。不得虚构引文，不得用出现次数直接代表总体比例。控制在1600字以内。`); box.value = content; saveAnalysisWorkspace({ textCoding: content, textCodingIds: ids, textCodingVersion: new Date().toISOString() }); } catch (error) { box.value = `生成失败：${error.message}`; }
+      });
+      document.getElementById("saveTextCodingBtn")?.addEventListener("click", () => saveAnalysisWorkspace({ textCoding: document.getElementById("textCodingOutput")?.value || "", textCodingConfirmed: true }));
+      document.getElementById("downloadTextCodingBtn")?.addEventListener("click", () => downloadWordDoc("文本初步编码.doc", "文本初步编码", `<p>${escapeHtml(document.getElementById("textCodingOutput")?.value || "").replace(/\n/g, "</p><p>")}</p>`));
+      document.getElementById("generateTextThemeBtn")?.addEventListener("click", async () => { const box = document.getElementById("textThemeOutput"); const focus = [...document.querySelectorAll("[data-theme-focus]:checked")].map((input) => input.value).join("、"); box.value = "正在分析主题、对象差异和证据关系..."; try { const content = await callModel(`题目：${analysisResearchContext().topic}\n提纲：${analysisResearchContext().outline}\n文本任务：${analysisWorkspace().textTask}\n学生确认的编码：${analysisWorkspace().textCoding}\n分析重点：${focus}\n\n请分析主要主题、主题之间的问题—原因—行为—结果关系、不同对象观点差异、反面案例、证据强弱，以及与量化研究任务可能的连接。明确哪些判断证据不足。控制在1300字以内。`); box.value = content; saveAnalysisWorkspace({ textThemes: content }); } catch (error) { box.value = `生成失败：${error.message}`; } });
+      document.getElementById("saveTextThemeBtn")?.addEventListener("click", () => { const content = document.getElementById("textThemeOutput")?.value || ""; saveAnalysisWorkspace({ textThemes: content }); saveAnalysisArtifact("文本主题与关系分析", "文本分析", content); alert("已保存到成果中心。"); });
+      document.getElementById("downloadTextThemeBtn")?.addEventListener("click", () => downloadWordDoc("文本主题与关系分析.doc", "文本主题与关系分析", `<p>${escapeHtml(document.getElementById("textThemeOutput")?.value || "").replace(/\n/g, "</p><p>")}</p>`));
+      document.getElementById("generateTextWriteBtn")?.addEventListener("click", async () => { const box = document.getElementById("textWriteOutput"); box.value = "正在形成可核验的论文式文本分析..."; try { const workspace = analysisWorkspace(); const content = await callModel(`题目：${analysisResearchContext().topic}\n提纲：${analysisResearchContext().outline}\n文本任务：${workspace.textTask}\n材料概况：${JSON.stringify(workspace.textMaterials)}\n学生确认编码：${workspace.textCoding}\n主题与关系分析：${workspace.textThemes}\n\n按论文口吻写：材料来源与对象、分析单位、筛选与匿名化、编码和人工复核方法、主要主题、对象差异、主题关系、与研究题目的联系、与量化结果待交叉验证之处、研究局限。只引用已有材料编号，不得补造原文和数量。控制在1600字以内。`); box.value = content; saveAnalysisWorkspace({ textWrite: content }); saveAnalysisArtifact("论文式文本分析", "文本分析", content); } catch (error) { box.value = `生成失败：${error.message}`; } });
+      document.getElementById("downloadTextWriteBtn")?.addEventListener("click", () => downloadWordDoc("文本信息分析结果.doc", "文本信息分析结果", `<p>${escapeHtml(analysisWorkspace().textWrite || "").replace(/\n/g, "</p><p>")}</p>`));
+    }
+
+    function saveAnalysisArtifact(title, type, content) {
+      if (!content.trim()) return;
+      const workspace = analysisWorkspace(); const artifact = { id: `artifact-${Date.now()}`, title, type, content, researchVersion: analysisResearchContext().version, datasetId: activeAnalysisDataset()?.id || "", createdAt: new Date().toLocaleString() };
+      saveAnalysisWorkspace({ artifacts: [artifact, ...(workspace.artifacts || [])].slice(0, 80) });
+    }
+
+    function analysisEvidenceHtml() {
+      const workspace = analysisWorkspace(); const publicText = collectionWorkspace().publicWriteAnalysis || "";
+      return `${analysisContextBar()}<div class="grid"><div class="panel span-5"><h3>成果中心</h3><div class="artifact-list">${(workspace.artifacts || []).map((item) => `<div class="artifact-item"><div><strong>${escapeHtml(item.title)}</strong><p class="hint">${escapeHtml(item.type)}｜版本${escapeHtml(item.researchVersion)}｜${escapeHtml(item.createdAt)}</p></div><div class="row"><button class="btn" data-evidence-preview="${item.id}" type="button">预览</button><button class="btn" data-evidence-download="${item.id}" type="button">下载</button></div></div>`).join("") || `<div class="notice">尚未保存分析成果。</div>`}</div>${publicText ? `<div class="notice ok" style="margin-top:10px;">已检测到“网络公开话题研究”的论文式文本分析，可用于综合证据。</div>` : ""}</div><div class="panel span-7"><h3>量化—访谈—网络文本证据整合</h3><textarea id="analysisEvidenceOutput" class="coach-output">${escapeHtml(workspace.evidenceText || "系统将逐项对应论文判断、量化证据、访谈/其他文本证据、网络公开材料、证据一致性和不能推出的结论。")}</textarea><div class="row" style="margin-top:10px;"><button class="btn primary" id="generateAnalysisEvidenceBtn" type="button">AI生成证据链</button><button class="btn" id="downloadAnalysisEvidenceBtn" type="button" ${workspace.evidenceText ? "" : "disabled"}>下载Word</button></div></div></div><div id="evidenceArtifactPreview" style="margin-top:10px;"></div>`;
+    }
+
+    function wireAnalysisEvidence() {
+      document.querySelectorAll("[data-evidence-preview]").forEach((button) => button.addEventListener("click", () => { const item = (analysisWorkspace().artifacts || []).find((entry) => entry.id === button.dataset.evidencePreview); document.getElementById("evidenceArtifactPreview").innerHTML = `<div class="panel"><h3>${escapeHtml(item?.title || "成果")}</h3><div class="result">${escapeHtml(item?.content || "")}</div></div>`; }));
+      document.querySelectorAll("[data-evidence-download]").forEach((button) => button.addEventListener("click", () => { const item = (analysisWorkspace().artifacts || []).find((entry) => entry.id === button.dataset.evidenceDownload); if (item) downloadWordDoc(`${item.title}.doc`, item.title, `<p>${escapeHtml(item.content).replace(/\n/g, "</p><p>")}</p>`); }));
+      document.getElementById("generateAnalysisEvidenceBtn")?.addEventListener("click", async () => { const box = document.getElementById("analysisEvidenceOutput"); box.value = "正在把不同来源的结果对应到研究问题..."; try { const workspace = analysisWorkspace(); const content = await callModel(`题目：${analysisResearchContext().topic}\n提纲：${analysisResearchContext().outline}\n分析任务表：${workspace.planText}\n量化结果：${workspace.quantWrite || (workspace.artifacts || []).filter((item) => item.type === "量化分析").map((item) => item.content).join("\n")}\n访谈及其他文本结果：${workspace.textWrite || workspace.textThemes || "未完成"}\n网络公开话题结果：${collectionWorkspace().publicWriteAnalysis || "未完成"}\n\n请形成证据链表述：论文判断｜量化证据｜访谈/其他文本证据｜网络公开证据｜证据是否一致｜能否成立｜不能推出的结论｜用于提纲位置。证据缺失时明确标注，不能为了完整而补造。最后给出最优先补充的证据。控制在1600字以内。`); box.value = content; saveAnalysisWorkspace({ evidenceText: content }); } catch (error) { box.value = `生成失败：${error.message}`; } });
+      document.getElementById("downloadAnalysisEvidenceBtn")?.addEventListener("click", () => downloadWordDoc("论文证据链.doc", "论文证据链", `<p>${escapeHtml(analysisWorkspace().evidenceText || "").replace(/\n/g, "</p><p>")}</p>`));
     }
 
     function renderSubmissions() {

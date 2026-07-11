@@ -1,11 +1,12 @@
-const CACHE_NAME = "thesis-ai-assistant-v11";
+const CACHE_NAME = "thesis-ai-assistant-v12";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "./icons/ai-tutor-avatar.png"
+  "./icons/ai-tutor-avatar.png",
+  "./vendor/xlsx.full.min.js"
 ];
 
 self.addEventListener("install", (event) => {
