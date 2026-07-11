@@ -450,6 +450,13 @@
       background: linear-gradient(135deg, var(--brand), var(--teal));
       box-shadow: 0 8px 18px rgba(37,99,235,.18);
     }
+    .collection-step[data-public-step="collect"] { color: #9a3412; border-color: #fdba74; background: #fff7ed; font-weight: 800; }
+    .collection-step[data-public-step="collect"].active { color: #fff; border-color: transparent; background: linear-gradient(135deg, #ea580c, #c2410c); box-shadow: 0 8px 18px rgba(194, 65, 12, 0.22); }
+    .search-action-primary { background: linear-gradient(135deg, #f97316, #c2410c) !important; box-shadow: 0 9px 20px rgba(194, 65, 12, 0.24); }
+    .sub-btn[data-module="collection"][data-sub="public"] { color: #9a3412; border-color: #fdba74; background: #fff7ed; font-weight: 800; }
+    .sub-btn[data-module="collection"][data-sub="public"].active { color: #fff; border-color: transparent; background: linear-gradient(135deg, #ea580c, #c2410c); }
+    .search-quota-badge { display: inline-flex; align-items: center; min-height: 38px; padding: 7px 12px; border: 1px solid #bae6d3; background: #ecfdf5; color: #047857; font-weight: 750; }
+    .admin-search-table td, .admin-search-table th { white-space: nowrap; }
     .source-card-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1604,6 +1611,7 @@
         <button class="nav-btn" data-target="adminSettings"><span class="nav-icon">03</span>系统设置</button>
         <button class="nav-btn" data-target="adminNotice"><span class="nav-icon">04</span>通知发放</button>
         <button class="nav-btn" data-target="adminStats"><span class="nav-icon">05</span>可视化统计</button>
+        <button class="nav-btn" data-target="adminSearchControl"><span class="nav-icon">06</span>话题收集控制</button>
       </div>
     </aside>
 
@@ -1645,6 +1653,7 @@
       <section id="adminSettings" class="module"></section>
       <section id="adminNotice" class="module"></section>
       <section id="adminStats" class="module"></section>
+      <section id="adminSearchControl" class="module"></section>
     </main>
   </div>
 
@@ -1811,6 +1820,7 @@
       adminSettings: ["系统设置", "设置学生端模块开放进度。"],
       adminNotice: ["通知发放", "编辑并发布学生端滚动通知。"],
       adminStats: ["可视化统计", "查看平台活跃度和用户行为统计。"]
+      ,adminSearchControl: ["话题收集控制", "查看学生搜索用量，并开放或暂停单个账号的话题搜索功能。"]
     };
 
     const studentModuleList = [
@@ -5985,6 +5995,7 @@ ${limitMethodContext(recent, 5000)}
           <div class="panel span-6"><h3>它能回答什么</h3><p class="hint">适合发现隐性问题、形成分类、理解过程，并为访谈和问卷提供线索；不能用热门帖子推断总体发生比例。</p></div>
           <div class="panel span-6"><h3>怎么做</h3><p class="hint">确定关键词和时间范围，人工确认相关公开内容，导入匿名文本，由AI初步编码，再由学生逐条复核。</p></div>
           <div class="panel span-6"><h3>主要偏差</h3><p class="hint">愿意发帖者具有自我选择，平台推荐影响可见内容，热门内容可能重复转载。因此网络样本应与判例、报告、访谈或问卷交叉验证。</p></div>
+          <div class="panel span-12"><h3>用到哪里</h3><div class="result" style="min-height:0;"><strong>作为面上数据：</strong>可以写在绪论、研究背景或研究对象现状部分，用公开报道、机构报告和社会讨论说明问题的主要表现与关注度，但不能用热门帖子推断总体发生比例。<br><br><strong>作为正式文本分析：</strong>可以放在实证研究部分，与问卷、访谈或量化分析处于同一研究方法层级。论文必须说明检索平台与时间、检索词、发现与采纳数量、筛选标准、编码过程、主题结论及研究局限。</div></div>
           <div class="panel span-12"><h3>合规边界</h3><div class="notice warn">不采集私信、私密群组和个人联系方式；不绕过登录、验证码、付费墙或访问限制。当前系统采用公开链接、文本、文件和截图OCR的半自动研究方式。</div></div>
         </div>`;
       if (step === "plan") return `
@@ -6015,17 +6026,18 @@ ${limitMethodContext(recent, 5000)}
       const endDate = workspace.publicSearchEnd || new Date().toISOString().slice(0, 10);
       const startDate = workspace.publicSearchStart || new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
       return `
-        <div class="notice">搜索结果不会自动进入分析。请对有价值的结果点击“导入摘要”或“提取正文”，然后进入“AI整理编码”，先完成“已复核纳入”，再点击“AI整理与编码”。每人每天最多实际联网搜索20次，每次最多返回20条；社交平台多组检索可能一次操作消耗2—3次额度，命中缓存不计次数。</div>
+        <div class="notice">搜索结果不会自动进入分析。请对有价值的结果点击“导入摘要”或“提取正文”，再进入“AI整理编码”完成复核。每次固定请求最多20条；“开始搜索”消耗1次，“扩大搜索”再消耗1次，命中COS缓存不计次数。</div>
         <div class="web-search-bar" style="margin-top:10px;">
           <div class="field"><label>搜索来源</label><select id="publicSearchType">${Object.entries(publicSearchTypeMeta).map(([id, meta]) => `<option value="${id}" ${id === searchType ? "selected" : ""}>${meta.label}</option>`).join("")}</select></div>
           <div class="field"><label>匹配模式</label><select id="publicSearchMatchMode"><option value="strict" ${matchMode === "strict" ? "selected" : ""}>严格匹配</option><option value="expand" ${matchMode === "expand" ? "selected" : ""}>扩展发现</option></select></div>
           <div class="field"><label>补充检索要求</label><input id="publicSearchExtra" type="text" value="${escapeHtml(workspace.publicSearchExtra || "")}" placeholder="可填写地区、群体、行为或需要排除的内容"></div>
           <div class="field"><label>开始日期</label><input id="publicSearchStart" type="date" value="${startDate}"></div>
           <div class="field"><label>结束日期</label><input id="publicSearchEnd" type="date" value="${endDate}"></div>
-          <div class="field"><label>结果数</label><select id="publicSearchCount"><option value="10" ${Number(workspace.publicSearchCount) !== 20 ? "selected" : ""}>10条</option><option value="20" ${Number(workspace.publicSearchCount) === 20 ? "selected" : ""}>20条</option></select></div>
-          <button class="btn primary" id="runPublicSearchBtn" type="button" ${topic ? "" : "disabled"}>AI开始搜索</button>
+          <div class="search-quota-badge">每次最多20条${workspace.publicSearchQuota ? `｜今日剩余${workspace.publicSearchQuota.remaining}次` : ""}</div>
+          <button class="btn primary search-action-primary" id="runPublicSearchBtn" type="button" ${topic ? "" : "disabled"}>开始搜索</button>
+          <button class="btn" id="expandPublicSearchBtn" type="button" ${topic && workspace.publicSearchQueries?.length > 1 ? "" : "disabled"}>扩大搜索</button>
         </div>
-        <div id="publicSearchStatus" class="notice ${results.length ? "ok" : ""}" style="margin-top:10px;">${results.length ? `已获得${results.length}条结果。实际检索词：${escapeHtml((workspace.publicSearchQueries || [workspace.publicSearchQuery]).filter(Boolean).join("；"))}${workspace.publicSearchCached ? "（部分或全部命中缓存）" : ""}` : topic ? `当前题目：${escapeHtml(topic)}` : "请先确认研究题目。"}</div>
+        <div id="publicSearchStatus" class="notice ${results.length ? "ok" : ""}" style="margin-top:10px;">${results.length ? `已获得${results.length}条结果。已执行检索词：${escapeHtml((workspace.publicExecutedQueries || [workspace.publicSearchQuery]).filter(Boolean).join("；"))}${workspace.publicSearchCached ? "（命中缓存，本次不计费）" : ""}${workspace.publicSearchQuota ? `｜今日剩余${workspace.publicSearchQuota.remaining}次` : ""}` : topic ? `当前题目：${escapeHtml(topic)}` : "请先确认研究题目。"}</div>
         ${platformInternalSearchHtml(searchType, workspace.publicSearchQueries || [workspace.publicSearchQuery || topic])}
         <div class="web-search-results">${publicSearchResultsHtml(results, matchMode)}</div>
         <details class="drawer manual-import-drawer" id="manualPublicImportDrawer"><summary>搜索未覆盖或正文提取失败：手动导入文字、链接或截图</summary><div class="drawer-body">
@@ -6283,15 +6295,16 @@ ${limitMethodContext(recent, 5000)}
       const savedSnapshot = workspace.publicWriteSnapshot || null;
       const stale = !!savedSnapshot && savedSnapshot.corpusId !== currentCorpusId;
       const snapshot = savedSnapshot || buildPublicWriteSnapshot();
-      const tab = ["analysis", "materials", "visual"].includes(workspace.publicWriteTab) ? workspace.publicWriteTab : "analysis";
+      const tab = ["analysis", "advanced", "materials", "visual"].includes(workspace.publicWriteTab) ? workspace.publicWriteTab : "analysis";
       return `
         <div class="notice ${stale ? "corpus-stale" : currentItems.length ? "ok" : "warn"}">${stale ? "已复核材料发生变化，现有文本结论、材料列表和可视化属于旧批次，请重新生成。" : currentItems.length ? `当前分析批次包含${currentItems.length}篇已复核材料。三个页面共享同一材料批次和版本。` : "尚无“已复核纳入”的材料。请返回AI整理编码完成复核。"}</div>
-        <div class="write-paper-tabs"><button class="btn ${tab === "analysis" ? "active" : ""}" data-public-write-tab="analysis" type="button">文本分析结果</button><button class="btn ${tab === "materials" ? "active" : ""}" data-public-write-tab="materials" type="button">文本材料列表</button><button class="btn ${tab === "visual" ? "active" : ""}" data-public-write-tab="visual" type="button">可视化分析结果</button></div>
+        <div class="write-paper-tabs"><button class="btn ${tab === "analysis" ? "active" : ""}" data-public-write-tab="analysis" type="button">文本分析结果</button><button class="btn ${tab === "advanced" ? "active" : ""}" data-public-write-tab="advanced" type="button">文本进阶分析智能体</button><button class="btn ${tab === "materials" ? "active" : ""}" data-public-write-tab="materials" type="button">文本材料列表</button><button class="btn ${tab === "visual" ? "active" : ""}" data-public-write-tab="visual" type="button">可视化分析结果</button></div>
         <div id="publicWriteStage">${publicWriteStageHtml(tab, snapshot, stale)}</div>`;
     }
 
     function publicWriteStageHtml(tab, snapshot, stale) {
       const workspace = collectionWorkspace();
+      if (tab === "advanced") return publicAdvancedAgentHtml(snapshot, stale);
       if (tab === "materials") return `
         <h3>文本材料列表</h3><p class="hint">列表与文本分析、可视化使用同一批材料。涉及个人敏感经历的社交平台链接，公开论文中建议改用来源编号，完整URL作为研究底稿留存。</p>
         <div class="table-wrap"><table class="material-paper-table"><thead><tr><th>编号</th><th>材料标题</th><th>发布时间</th><th>来源</th><th>链接</th></tr></thead><tbody>${snapshot.materials.length ? snapshot.materials.map((item) => `<tr><td>${item.no}</td><td>${escapeHtml(item.title)}</td><td>${escapeHtml(item.date)}</td><td>${escapeHtml(item.source)}</td><td>${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">打开链接</a>` : "无"}</td></tr>`).join("") : `<tr><td colspan="5">暂无已复核材料</td></tr>`}</tbody></table></div>
@@ -6306,6 +6319,54 @@ ${limitMethodContext(recent, 5000)}
         <textarea id="publicWriteAnalysisOutput" class="coach-output" readonly>${escapeHtml(workspace.publicWriteAnalysis || "点击生成后，系统将以论文口吻说明检索范围、筛选与编码方法、主要主题和研究局限；所有数量由程序计算，AI不得自行编造。")}</textarea>
         <div class="row" style="margin-top:10px;"><button class="btn primary" id="generatePublicWriteBtn" type="button" ${snapshot.stats.accepted && workspace.publicCoding ? "" : "disabled"}>生成论文式文本分析</button><button class="btn" id="downloadPublicAnalysisBtn" type="button" ${workspace.publicWriteAnalysis && !stale ? "" : "disabled"}>下载Word文档</button></div>
         ${!workspace.publicCoding ? `<div class="notice warn" style="margin-top:10px;">请先在“AI整理编码”中生成编码结果，再生成论文式分析。</div>` : ""}`;
+    }
+
+    function publicAdvancedAgentHtml(snapshot, stale) {
+      const workspace = collectionWorkspace();
+      const messages = workspace.publicAdvancedMessages || [];
+      const topic = snapshot.topic || "当前题目";
+      const questions = [
+        `这些文本对“${topic}”揭示了哪些主要问题类型？`,
+        "不同来源或平台的讨论重点有什么差异？",
+        "哪些结论有多份材料支持，哪些只是个别现象？",
+        "文本中反映的问题、原因和结果之间有什么联系？",
+        "这些文本结论如何与问卷、访谈或量化结果交叉验证？",
+        "这批材料还缺少哪些群体、反面案例或沉默者视角？"
+      ];
+      return `
+        <h3>文本进阶分析智能体</h3>
+        <div class="method-chat-context"><strong>${escapeHtml(topic)}</strong><span class="tag">已复核材料${snapshot.stats.accepted}篇</span><span class="tag">回答仅依据当前材料批次</span></div>
+        <div class="chat-quick">${questions.map((question) => `<button class="btn" type="button" data-public-advanced-question="${escapeHtml(question)}">${escapeHtml(question)}</button>`).join("")}</div>
+        <div class="method-chat-input-panel"><div class="method-chat-composer"><textarea id="publicAdvancedInput" placeholder="请输入希望进一步分析的问题，例如：不同平台对这一问题的解释是否不同？" ${snapshot.stats.accepted && !stale ? "" : "disabled"}></textarea><button class="btn primary" id="sendPublicAdvancedBtn" type="button" ${snapshot.stats.accepted && !stale ? "" : "disabled"}>发送</button></div></div>
+        <div id="publicAdvancedLog" class="method-chat-log">${publicAdvancedMessagesHtml(messages)}</div>
+        <div class="row" style="margin-top:10px;"><button class="btn" id="downloadPublicAdvancedBtn" type="button" ${messages.length ? "" : "disabled"}>下载对话记录</button><button class="btn danger" id="clearPublicAdvancedBtn" type="button" ${messages.length ? "" : "disabled"}>清空当前对话</button></div>
+        ${stale ? `<div class="notice warn" style="margin-top:10px;">材料批次已经变化，请先重新生成文本分析，再继续进阶分析。</div>` : ""}`;
+    }
+
+    function publicAdvancedMessagesHtml(messages) {
+      if (!messages.length) return `<div class="chat-message assistant"><img class="chat-avatar" src="icons/ai-tutor-avatar.png" alt="AI论文指导教师"><div class="chat-bubble">同学你好。我会结合你的题目、提纲、研究方法建议、研究对象与抽样建议，以及已经复核的网络文本回答问题。我会区分材料直接反映的内容和推断，不把网络文本解释为总体发生率。</div></div>`;
+      const initial = String(currentLoginUser().name || "学").trim().slice(0, 1) || "学";
+      return messages.map((item) => item.role === "assistant"
+        ? `<div class="chat-message assistant"><img class="chat-avatar" src="icons/ai-tutor-avatar.png" alt="AI论文指导教师"><div class="chat-bubble">${escapeHtml(item.content || "")}</div></div>`
+        : `<div class="chat-message user"><div class="chat-avatar chat-user-avatar">${escapeHtml(initial)}</div><div class="chat-bubble">${escapeHtml(item.content || "")}</div></div>`).join("");
+    }
+
+    function publicAdvancedPrompt(question, messages, snapshot) {
+      const methodContext = methodInheritedContext();
+      const excerpts = confirmedPublicMaterials().slice(0, 30).map((item) => `${item.sourceNo || "材料"}｜${item.title || "标题待确认"}｜${String(item.anonymousText || "").slice(0, 800)}`).join("\n\n");
+      const recent = messages.slice(-8).map((item) => `${item.role === "assistant" ? "导师" : "学生"}：${item.content}`).join("\n");
+      return `请依据该学生已经人工复核的网络公开文本，简洁回答最后一个问题。
+题目：${snapshot.topic}
+已确认提纲：${limitMethodContext(methodContext?.context?.outline || project.outline || "未确认", 3500)}
+研究方法建议：${limitMethodContext(methodOutput("advice") || "未生成", 2500)}
+研究对象与抽样建议：${limitMethodContext(methodOutput("sampling") || "未生成", 1800)}
+既有文本分析：${limitMethodContext(collectionWorkspace().publicWriteAnalysis || "未生成", 2500)}
+编码结果：${limitMethodContext(collectionWorkspace().publicCoding || "未生成", 2500)}
+材料：\n${limitMethodContext(excerpts, 12000)}
+最近对话：\n${limitMethodContext(recent, 3500)}
+学生问题：${question}
+
+要求：只依据当前材料作答；尽量标明材料编号；分清“材料直接反映”和“可能的解释”；材料不足时明确说不足；不得虚构引文、数量和因果；不得把网络样本推断为总体发生率；用3—6个要点，控制在600字以内。`;
     }
 
     function publicMaterialsTableDoc(snapshot) {
@@ -6356,6 +6417,48 @@ ${limitMethodContext(recent, 5000)}
       }));
       const workspace = collectionWorkspace();
       const snapshot = workspace.publicWriteSnapshot || buildPublicWriteSnapshot();
+      const advancedInput = document.getElementById("publicAdvancedInput");
+      document.querySelectorAll("[data-public-advanced-question]").forEach((button) => button.addEventListener("click", () => {
+        if (!advancedInput) return;
+        advancedInput.value = button.dataset.publicAdvancedQuestion;
+        advancedInput.focus();
+      }));
+      document.getElementById("sendPublicAdvancedBtn")?.addEventListener("click", async () => {
+        const input = document.getElementById("publicAdvancedInput");
+        const send = document.getElementById("sendPublicAdvancedBtn");
+        const question = input?.value.trim() || "";
+        if (!question || send?.disabled) return;
+        const freshSnapshot = buildPublicWriteSnapshot();
+        const messages = [...(collectionWorkspace().publicAdvancedMessages || []), { role: "user", content: question, at: new Date().toISOString() }].slice(-40);
+        saveCollectionWorkspace({ publicAdvancedMessages: messages, publicAdvancedCorpusId: freshSnapshot.corpusId });
+        input.value = "";
+        send.disabled = true;
+        const log = document.getElementById("publicAdvancedLog");
+        if (log) {
+          log.innerHTML = publicAdvancedMessagesHtml(messages) + `<div class="chat-message assistant"><img class="chat-avatar" src="icons/ai-tutor-avatar.png" alt="AI论文指导教师"><div class="chat-bubble">正在对照当前材料、提纲和研究方法分析...</div></div>`;
+          log.scrollTop = log.scrollHeight;
+        }
+        try {
+          const answer = await callModel(publicAdvancedPrompt(question, messages, freshSnapshot), "你是严谨、简洁的本科论文文本研究指导教师。不得脱离学生已经复核的文本材料作答。区分证据、解释和推测。");
+          messages.push({ role: "assistant", content: answer, at: new Date().toISOString() });
+        } catch (error) {
+          messages.push({ role: "assistant", content: `当前模型未能完成回答：${error.message}`, at: new Date().toISOString() });
+        }
+        saveCollectionWorkspace({ publicAdvancedMessages: messages.slice(-40), publicAdvancedCorpusId: freshSnapshot.corpusId });
+        setSubContent("collection", "public", publicTopicStudyHtml());
+      });
+      advancedInput?.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); document.getElementById("sendPublicAdvancedBtn")?.click(); }
+      });
+      document.getElementById("clearPublicAdvancedBtn")?.addEventListener("click", () => {
+        if (!confirm("确定清空当前材料批次的文本进阶分析对话吗？")) return;
+        saveCollectionWorkspace({ publicAdvancedMessages: [] });
+        setSubContent("collection", "public", publicTopicStudyHtml());
+      });
+      document.getElementById("downloadPublicAdvancedBtn")?.addEventListener("click", () => {
+        const text = (collectionWorkspace().publicAdvancedMessages || []).map((item) => `${item.role === "assistant" ? "AI论文指导教师" : "学生"}：\n${item.content}`).join("\n\n");
+        downloadTextFile("网络公开文本进阶分析对话.txt", text, "text/plain;charset=utf-8");
+      });
       if (document.getElementById("publicTextVisualCanvas")) drawPublicVisualization(snapshot);
       document.getElementById("generatePublicWriteBtn")?.addEventListener("click", async () => {
         const output = document.getElementById("publicWriteAnalysisOutput");
@@ -6405,7 +6508,9 @@ ${limitMethodContext(recent, 5000)}
           saveCollectionWorkspace({ publicPlan: content });
         } catch (error) { output.value = `生成失败：${error.message}`; }
       });
-      document.getElementById("runPublicSearchBtn")?.addEventListener("click", async () => {
+      document.getElementById("runPublicSearchBtn")?.addEventListener("click", () => runPublicSearch(false));
+      document.getElementById("expandPublicSearchBtn")?.addEventListener("click", () => runPublicSearch(true));
+      async function runPublicSearch(expand = false) {
         const status = document.getElementById("publicSearchStatus");
         const topic = collectionResearchContext().topic;
         const type = document.getElementById("publicSearchType").value;
@@ -6413,36 +6518,30 @@ ${limitMethodContext(recent, 5000)}
         const extra = document.getElementById("publicSearchExtra").value.trim();
         const start = document.getElementById("publicSearchStart").value;
         const end = document.getElementById("publicSearchEnd").value;
-        const count = Number(document.getElementById("publicSearchCount").value || 10);
         if (!topic) { status.className = "notice warn"; status.textContent = "请先确认研究题目。"; return; }
         if (start && end && start > end) { status.className = "notice warn"; status.textContent = "开始日期不能晚于结束日期。"; return; }
         status.className = "notice";
         status.textContent = "AI正在生成检索式...";
         try {
-          const queries = await optimizePublicSearchQueries(topic, type, extra);
-          status.textContent = `将运行${queries.length}组检索：${queries.join("；")}`;
+          const workspaceBefore = collectionWorkspace();
+          const queries = expand && workspaceBefore.publicSearchQueries?.length > 1 ? workspaceBefore.publicSearchQueries : await optimizePublicSearchQueries(topic, type, extra);
+          const executedBefore = expand ? (workspaceBefore.publicExecutedQueries || []) : [];
+          const query = expand ? queries.find((item) => !executedBefore.includes(item)) : queries[0];
+          if (!query) throw new Error("没有新的补充检索词，请调整补充检索要求后重新开始搜索");
+          status.textContent = `${expand ? "扩大搜索" : "开始搜索"}将消耗1次额度：${query}`;
           beginAiWait("正在调用腾讯云联网搜索");
-          const gathered = [];
-          const cacheFlags = [];
-          const requestIds = [];
-          const failures = [];
+          let search;
           try {
-            for (const query of queries) {
-              try {
-                const search = await callCloudFunction("searchWeb", {
-                  query,
-                  site: publicSearchTypeMeta[type]?.site || "",
-                  fromTime: start ? Math.floor(new Date(`${start}T00:00:00`).getTime() / 1000) : 0,
-                  toTime: end ? Math.floor(new Date(`${end}T23:59:59`).getTime() / 1000) : 0,
-                  count: 10
-                });
-                gathered.push(...(search.results || []));
-                cacheFlags.push(!!search.cached);
-                if (search.requestId) requestIds.push(search.requestId);
-              } catch (error) { failures.push(`${query}：${error.message}`); }
-            }
+            search = await callCloudFunction("searchWeb", {
+              query,
+              site: publicSearchTypeMeta[type]?.site || "",
+              fromTime: start ? Math.floor(new Date(`${start}T00:00:00`).getTime() / 1000) : 0,
+              toTime: end ? Math.floor(new Date(`${end}T23:59:59`).getTime() / 1000) : 0,
+              count: 20
+            });
           } finally { endAiWait(); }
-          if (!gathered.length) throw new Error(failures[0] || "没有找到可用结果");
+          const gathered = [...(expand ? workspaceBefore.publicSearchResults || [] : []), ...(search.results || [])];
+          if (!gathered.length) throw new Error("没有找到可用结果");
           const expectedSite = publicSearchTypeMeta[type]?.site || "";
           const siteFiltered = expectedSite ? gathered.filter((result) => { try { return new URL(result.url).hostname.toLowerCase().endsWith(expectedSite); } catch (error) { return false; } }) : gathered;
           const unique = [];
@@ -6452,17 +6551,18 @@ ${limitMethodContext(recent, 5000)}
             if (!seen.has(key)) { seen.add(key); unique.push(result); }
           });
           status.textContent = `合并去重后${unique.length}条，AI正在判断研究匹配度...`;
-          const ranked = (await rankPublicSearchResults(topic, unique.slice(0, 40))).slice(0, count);
+          const ranked = (await rankPublicSearchResults(topic, unique.slice(0, 40))).slice(0, 20);
           const beforeSearch = collectionWorkspace();
           const seenUrls = new Set(beforeSearch.publicSearchSeenUrls || []);
           unique.forEach((result) => { if (result.url) seenUrls.add(result.url); });
-          saveCollectionWorkspace({ publicSearchType: type, publicSearchMatchMode: matchMode, publicSearchExtra: extra, publicSearchStart: start, publicSearchEnd: end, publicSearchCount: count, publicSearchQueries: queries, publicSearchQuery: queries[0] || "", publicSearchResults: ranked, publicSearchCached: cacheFlags.length > 0 && cacheFlags.every(Boolean), publicSearchRequestId: requestIds.join(","), publicSearchFailures: failures, publicSearchSeenUrls: [...seenUrls].slice(-500) });
+          const executedQueries = [...new Set([...executedBefore, query])];
+          saveCollectionWorkspace({ publicSearchType: type, publicSearchMatchMode: matchMode, publicSearchExtra: extra, publicSearchStart: start, publicSearchEnd: end, publicSearchCount: 20, publicSearchQueries: queries, publicExecutedQueries: executedQueries, publicSearchQuery: query, publicSearchResults: ranked, publicSearchCached: !!search.cached, publicSearchRequestId: search.requestId || "", publicSearchFailures: [], publicSearchQuota: search.quota || workspaceBefore.publicSearchQuota || null, publicSearchSeenUrls: [...seenUrls].slice(-500) });
           setSubContent("collection", "public", publicTopicStudyHtml());
         } catch (error) {
           status.className = "notice warn";
           status.textContent = `搜索失败：${error.message}`;
         }
-      });
+      }
       document.querySelectorAll("[data-import-search-summary]").forEach((button) => button.addEventListener("click", () => {
         const workspace = collectionWorkspace();
         const result = (workspace.publicSearchResults || []).find((item) => item.id === button.dataset.importSearchSummary);
@@ -6689,6 +6789,40 @@ ${limitMethodContext(recent, 5000)}
       renderAdminSettings();
       renderAdminNotice();
       renderAdminStats();
+      renderAdminSearchControl();
+    }
+
+    function renderAdminSearchControl() {
+      const root = document.getElementById("adminSearchControl");
+      root.innerHTML = `<div class="panel"><div class="row" style="justify-content:space-between;"><div><h3>话题收集控制</h3><p class="hint">每次进入或刷新时，云函数都会重新读取COS中的 studentPIN.txt，并合并实际联网搜索记录。</p></div><button class="btn primary" id="refreshSearchControlBtn" type="button">刷新名单与用量</button></div><div id="adminSearchControlArea" class="notice" style="margin-top:12px;">点击刷新，读取最新学生名单。</div></div>`;
+      document.getElementById("refreshSearchControlBtn")?.addEventListener("click", loadAdminSearchControl);
+      if (currentLoginUser().role === "admin") loadAdminSearchControl();
+    }
+
+    async function loadAdminSearchControl() {
+      const area = document.getElementById("adminSearchControlArea");
+      if (!area) return;
+      area.className = "notice";
+      area.textContent = "正在从COS读取最新学生名单和搜索用量...";
+      try {
+        const users = await callCloudFunction("listSearchControlUsers", {});
+        area.className = "";
+        area.innerHTML = `<div class="result" style="min-height:0; margin-bottom:10px;">学生账号：${users.length}人｜累计实际联网搜索：${users.reduce((sum, item) => sum + (item.totalSearchCount || 0), 0)}次｜今日实际联网搜索：${users.reduce((sum, item) => sum + (item.todaySearchCount || 0), 0)}次｜已暂停：${users.filter((item) => item.enabled === false).length}人</div><div class="table-wrap" style="max-height:560px; overflow:auto;"><table class="admin-search-table"><thead><tr><th>姓名</th><th>邀请码</th><th>今日搜索</th><th>累计搜索</th><th>最近搜索</th><th>状态</th><th>操作</th></tr></thead><tbody>${users.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.pinMasked || "")}</td><td>${item.todaySearchCount || 0}</td><td>${item.totalSearchCount || 0}</td><td>${escapeHtml(item.lastSearchAt || "尚未搜索")}</td><td><span class="tag">${item.enabled === false ? "已暂停" : "已开放"}</span></td><td><button class="btn ${item.enabled === false ? "primary" : "danger"}" type="button" data-search-user-toggle="${escapeHtml(item.id)}" data-next-enabled="${item.enabled === false ? "true" : "false"}">${item.enabled === false ? "开放" : "关闭"}</button></td></tr>`).join("") || `<tr><td colspan="7">studentPIN.txt 中暂无可识别的学生账号。</td></tr>`}</tbody></table></div>`;
+        area.querySelectorAll("[data-search-user-toggle]").forEach((button) => button.addEventListener("click", async () => {
+          button.disabled = true;
+          button.textContent = "处理中...";
+          try {
+            await callCloudFunction("setSearchUserEnabled", { id: button.dataset.searchUserToggle, enabled: button.dataset.nextEnabled === "true" });
+            await loadAdminSearchControl();
+          } catch (error) {
+            area.className = "notice warn";
+            area.textContent = `操作失败：${error.message}`;
+          }
+        }));
+      } catch (error) {
+        area.className = "notice warn";
+        area.textContent = `读取失败：${error.message}`;
+      }
     }
 
     function renderAdminSettings() {
@@ -6807,8 +6941,8 @@ ${limitMethodContext(recent, 5000)}
 
     function adminBehaviorHtml(users) {
       return `<div class="panel"><h3>用户行为统计</h3><div class="table-wrap" style="max-height:520px; overflow:auto;"><table>
-        <thead><tr><th>姓名</th><th>邀请码</th><th>登录总次数</th><th>最近登录日期</th><th>使用总时长</th><th>形成候选题目次</th></tr></thead>
-        <tbody>${users.map((u) => `<tr><td>${escapeHtml(u.name)}</td><td>${escapeHtml(u.pin || "")}</td><td>${u.loginCount || 0}</td><td>${escapeHtml(u.lastLoginAt || "")}</td><td>${formatDuration(u.durationMs || 0)}</td><td>${u.topicDiagnosisCount || 0}</td></tr>`).join("") || `<tr><td colspan="6">暂无统计数据。</td></tr>`}</tbody>
+        <thead><tr><th>姓名</th><th>角色</th><th>邀请码</th><th>登录总次数</th><th>最近登录日期</th><th>使用总时长</th><th>候选题目诊断</th><th>今日搜索</th><th>累计搜索</th><th>话题搜索状态</th></tr></thead>
+        <tbody>${users.map((u) => `<tr><td>${escapeHtml(u.name)}</td><td>${escapeHtml(u.role || "")}</td><td>${escapeHtml(u.pin || "")}</td><td>${u.loginCount || 0}</td><td>${escapeHtml(u.lastLoginAt || "")}</td><td>${formatDuration(u.durationMs || 0)}</td><td>${u.topicDiagnosisCount || 0}</td><td>${u.todaySearchCount || 0}</td><td>${u.totalSearchCount || 0}</td><td>${u.role === "student" ? (u.searchEnabled === false ? "已暂停" : "已开放") : "-"}</td></tr>`).join("") || `<tr><td colspan="10">暂无统计数据。</td></tr>`}</tbody>
       </table></div></div>`;
     }
 
