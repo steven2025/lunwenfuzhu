@@ -501,6 +501,23 @@
       border-radius: var(--radius);
       background: #fff;
     }
+    .review-card { position: relative; padding: 12px; border-left: 5px solid #cbd5e1; background: #fff; }
+    .review-card.pending { border-left-color: #d97706; background: #fffbeb; }
+    .review-card.confirmed { border-left-color: #15803d; background: #f0fdf4; }
+    .review-card.excluded { border-left-color: #94a3b8; background: #f8fafc; opacity: .82; }
+    .review-card-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; padding-right: 2px; }
+    .review-card-title { min-width: 0; }
+    .review-card-title strong { display: block; color: #10213b; line-height: 1.45; }
+    .review-card-title small { display: block; margin-top: 4px; color: var(--muted); }
+    .review-control { display: flex; gap: 7px; align-items: center; flex: 0 0 auto; }
+    .review-control select { width: auto; min-width: 122px; padding: 7px 28px 7px 9px; font-size: 13px; font-weight: 700; }
+    .review-state { display: inline-flex; align-items: center; min-height: 30px; padding: 5px 8px; border: 1px solid #cbd5e1; background: #fff; color: #475569; font-size: 12px; font-weight: 800; white-space: nowrap; }
+    .review-state.pending { color: #92400e; border-color: #f5c66b; background: #fff7d6; }
+    .review-state.confirmed { color: #166534; border-color: #86d29a; background: #dcfce7; }
+    .review-state.excluded { color: #475569; border-color: #cbd5e1; background: #e2e8f0; }
+    .review-content { margin-top: 10px; padding: 10px 11px; max-height: 220px; overflow: auto; border: 1px solid rgba(148,163,184,.45); background: rgba(255,255,255,.82); color: #27364b; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .review-link { display: inline-block; margin-top: 8px; font-size: 12px; }
+    @media (max-width: 720px) { .review-card-head { display: block; } .review-control { margin-top: 9px; justify-content: space-between; } }
     .collection-item {
       padding: 10px;
       border-bottom: 1px solid var(--line);
@@ -6043,19 +6060,19 @@ ${limitMethodContext(recent, 5000)}
       const topic = collectionResearchContext().topic;
       const searchType = publicSearchTypeMeta[workspace.publicSearchType] ? workspace.publicSearchType : "news";
       const matchMode = workspace.publicSearchMatchMode === "expand" ? "expand" : "strict";
-      const endDate = workspace.publicSearchEnd || new Date().toISOString().slice(0, 10);
-      const startDate = workspace.publicSearchStart || new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
+      const endDate = new Date().toISOString().slice(0, 10);
+      const startAt = new Date();
+      startAt.setFullYear(startAt.getFullYear() - 5);
+      const startDate = startAt.toISOString().slice(0, 10);
       return `
-        <div class="notice">搜索结果不会自动进入分析。请对有价值的结果点击“导入摘要”或“提取正文”，再进入“AI整理编码”完成复核。每次固定请求最多20条；“开始搜索”消耗1次，“扩大搜索”再消耗1次，命中COS缓存不计次数。</div>
+        <div class="notice">搜索结果不会自动进入分析。请对有价值的结果点击“导入摘要”或“提取正文”，再进入“AI整理编码”完成复核。每次只运行一个AI优化后的主检索词，固定搜索最近五年，最多返回20条；命中COS缓存不计次数。</div>
         <div class="web-search-bar" style="margin-top:10px;">
           <div class="field"><label>搜索来源</label><select id="publicSearchType">${Object.entries(publicSearchTypeMeta).map(([id, meta]) => `<option value="${id}" ${id === searchType ? "selected" : ""}>${meta.label}</option>`).join("")}</select></div>
           <div class="field"><label>匹配模式</label><select id="publicSearchMatchMode"><option value="strict" ${matchMode === "strict" ? "selected" : ""}>严格匹配</option><option value="expand" ${matchMode === "expand" ? "selected" : ""}>扩展发现</option></select></div>
           <div class="field"><label>补充检索要求</label><input id="publicSearchExtra" type="text" value="${escapeHtml(workspace.publicSearchExtra || "")}" placeholder="可填写地区、群体、行为或需要排除的内容"></div>
-          <div class="field"><label>开始日期</label><input id="publicSearchStart" type="date" value="${startDate}"></div>
-          <div class="field"><label>结束日期</label><input id="publicSearchEnd" type="date" value="${endDate}"></div>
+          <div class="search-quota-badge">检索时间：${startDate} 至 ${endDate}</div>
           <div class="search-quota-badge">每次最多20条${workspace.publicSearchQuota ? `｜今日剩余${workspace.publicSearchQuota.remaining}次` : ""}</div>
           <button class="btn primary search-action-primary" id="runPublicSearchBtn" type="button" ${topic ? "" : "disabled"}>开始搜索</button>
-          <button class="btn" id="expandPublicSearchBtn" type="button" ${topic && workspace.publicSearchQueries?.length > 1 ? "" : "disabled"}>扩大搜索</button>
         </div>
         <div id="publicSearchStatus" class="notice ${results.length ? "ok" : ""}" style="margin-top:10px;">${results.length ? `已获得${results.length}条结果。已执行检索词：${escapeHtml((workspace.publicExecutedQueries || [workspace.publicSearchQuery]).filter(Boolean).join("；"))}${workspace.publicSearchCached ? "（命中缓存，本次不计费）" : ""}${workspace.publicSearchQuota ? `｜今日剩余${workspace.publicSearchQuota.remaining}次` : ""}` : topic ? `当前题目：${escapeHtml(topic)}` : "请先确认研究题目。"}</div>
         ${platformInternalSearchHtml(searchType, workspace.publicSearchQueries || [workspace.publicSearchQuery || topic])}
@@ -6132,13 +6149,11 @@ ${limitMethodContext(recent, 5000)}
     async function optimizePublicSearchQueries(topic, type, extra) {
       const meta = publicSearchTypeMeta[type] || publicSearchTypeMeta.news;
       const fallback = `${topic} ${meta.suffix} ${extra || ""}`.replace(/\s+/g, " ").trim().slice(0, 180);
-      const isSocial = ["xhs", "zhihu", "weibo", "forum"].includes(type);
       try {
-        const count = isSocial ? 3 : 2;
         const style = type === "xhs" ? "采用当事人口吻和生活化短语，例如被架空、被穿小鞋、产假回来没岗位" : type === "zhihu" ? "采用问题式表达和经验讨论，例如怎么办、是什么体验、为什么" : type === "weibo" ? "采用事件和话题表达" : "兼顾正式名称与自然语言表达";
-        const content = await callModel(`论文题目：${topic}\n搜索来源：${meta.label}\n补充要求：${extra || "无"}\n请生成${count}条彼此不同的中文互联网短检索语句。${style}。每条只聚焦一个具体对象或现象，不使用学术化长标题，不要使用site:。只输出JSON字符串数组，例如["检索词1","检索词2"]。`);
+        const content = await callModel(`论文题目：${topic}\n搜索来源：${meta.label}\n补充要求：${extra || "无"}\n请只生成1条高质量中文互联网短检索语句。${style}。提取研究对象、现实行为、典型表现和常用同义词，不直接照抄学术化论文标题，不使用“实证研究、影响机制、文献综述”等论文表达，不要使用site:。只输出JSON字符串数组，例如["检索词1"]。`);
         const queries = cleanModelJson(content).map((item) => String(item || "").trim().slice(0, 100)).filter(Boolean);
-        return queries.length ? queries.slice(0, count) : [fallback];
+        return queries.length ? queries.slice(0, 1) : [fallback];
       } catch (error) { return [fallback]; }
     }
 
@@ -6224,11 +6239,25 @@ ${limitMethodContext(recent, 5000)}
     function publicCodeHtml() {
       const workspace = collectionWorkspace();
       const items = workspace.publicItems || [];
+      const confirmedCount = items.filter((item) => item.reviewStatus === "confirmed").length;
+      const reviewCards = items.map((item) => {
+        const status = item.reviewStatus === "confirmed" ? "confirmed" : item.reviewStatus === "excluded" ? "excluded" : "pending";
+        const statusLabel = status === "confirmed" ? "✓ 已纳入" : status === "excluded" ? "× 已排除" : "○ 待复核";
+        const content = item.anonymousText || item.text || "当前材料没有可显示的文本内容。";
+        return `<article class="collection-item review-card ${status}" data-review-card="${item.id}">
+          <div class="review-card-head">
+            <div class="review-card-title"><strong>${escapeHtml(item.sourceNo)} · ${escapeHtml(item.title || "标题待确认")}</strong><small>${escapeHtml(item.platform || "公开网页")}｜${escapeHtml(item.publishDate || item.collectedAt || "日期待确认")}</small></div>
+            <div class="review-control"><span class="review-state ${status}">${statusLabel}</span><select aria-label="${escapeHtml(item.sourceNo)}复核状态" data-public-review="${item.id}"><option value="pending" ${status === "pending" ? "selected" : ""}>待复核</option><option value="confirmed" ${status === "confirmed" ? "selected" : ""}>已复核纳入</option><option value="excluded" ${status === "excluded" ? "selected" : ""}>排除</option></select></div>
+          </div>
+          <div class="review-content">${escapeHtml(content)}</div>
+          ${item.url ? `<a class="review-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">打开原始来源</a>` : ""}
+        </article>`;
+      }).join("");
       return `
-        <div class="notice">这里只显示在“话题收集”中点击过“导入摘要”“提取正文”或“匿名化并保存”的材料。请先逐条选择“已复核纳入”或“排除”，再点击“AI整理与编码”；AI只读取匿名文本，不能替代学生判断。</div>
+        <div class="notice">下方显示材料标题、来源和匿名文本。请阅读内容后，在每张材料卡右上角选择“已复核纳入”或“排除”；卡片颜色和状态标签会同步变化。AI只读取匿名文本，不能替代学生判断。</div>
         <div class="collection-split" style="margin-top:12px;">
-          <div class="panel"><h3>人工复核（${items.length}条）</h3><div class="collection-list">${items.length ? items.map((item) => `<div class="collection-item"><strong>${escapeHtml(item.sourceNo)} · ${escapeHtml(item.platform)}</strong><div class="field" style="margin:7px 0 0;"><select data-public-review="${item.id}"><option value="pending" ${item.reviewStatus !== "confirmed" && item.reviewStatus !== "excluded" ? "selected" : ""}>待复核</option><option value="confirmed" ${item.reviewStatus === "confirmed" ? "selected" : ""}>已复核纳入</option><option value="excluded" ${item.reviewStatus === "excluded" ? "selected" : ""}>排除</option></select></div></div>`).join("") : `<div class="notice" style="margin:10px;">请先收集公开话题。</div>`}</div></div>
-          <div class="panel"><h3>AI编码结果</h3><div id="publicCodingOutput" class="collection-output">${escapeHtml(workspace.publicCoding || "等待生成。编码将包括阶段、排挤行为、实施主体、伦理问题、员工反应、结果和证据强度。")}</div><div class="row" style="margin-top:10px;"><button class="btn primary" id="generatePublicCodingBtn" type="button" ${items.length ? "" : "disabled"}>AI整理与编码</button><button class="btn" id="exportPublicDataBtn" type="button" ${items.length ? "" : "disabled"}>导出匿名CSV</button></div></div>
+          <div class="panel"><h3>人工复核（${items.length}条）</h3><div class="collection-list">${items.length ? reviewCards : `<div class="notice" style="margin:10px;">请先收集公开话题。</div>`}</div></div>
+          <div class="panel"><h3>AI编码结果</h3><div id="publicConfirmedCount" class="notice ${confirmedCount ? "ok" : "warn"}" style="margin-bottom:10px;">已复核纳入${confirmedCount}条；AI编码只读取这些已纳入材料。</div><div id="publicCodingOutput" class="collection-output">${escapeHtml(workspace.publicCoding || "等待生成。编码将包括阶段、排挤行为、实施主体、伦理问题、员工反应、结果和证据强度。")}</div><div class="row" style="margin-top:10px;"><button class="btn primary" id="generatePublicCodingBtn" type="button" ${confirmedCount ? "" : "disabled"}>AI整理与编码</button><button class="btn" id="exportPublicDataBtn" type="button" ${items.length ? "" : "disabled"}>导出匿名CSV</button></div></div>
         </div>`;
     }
 
@@ -6528,27 +6557,26 @@ ${limitMethodContext(recent, 5000)}
           saveCollectionWorkspace({ publicPlan: content });
         } catch (error) { output.value = `生成失败：${error.message}`; }
       });
-      document.getElementById("runPublicSearchBtn")?.addEventListener("click", () => runPublicSearch(false));
-      document.getElementById("expandPublicSearchBtn")?.addEventListener("click", () => runPublicSearch(true));
-      async function runPublicSearch(expand = false) {
+      document.getElementById("runPublicSearchBtn")?.addEventListener("click", () => runPublicSearch());
+      async function runPublicSearch() {
         const status = document.getElementById("publicSearchStatus");
         const topic = collectionResearchContext().topic;
         const type = document.getElementById("publicSearchType").value;
         const matchMode = document.getElementById("publicSearchMatchMode").value;
         const extra = document.getElementById("publicSearchExtra").value.trim();
-        const start = document.getElementById("publicSearchStart").value;
-        const end = document.getElementById("publicSearchEnd").value;
+        const end = new Date().toISOString().slice(0, 10);
+        const startAt = new Date();
+        startAt.setFullYear(startAt.getFullYear() - 5);
+        const start = startAt.toISOString().slice(0, 10);
         if (!topic) { status.className = "notice warn"; status.textContent = "请先确认研究题目。"; return; }
-        if (start && end && start > end) { status.className = "notice warn"; status.textContent = "开始日期不能晚于结束日期。"; return; }
         status.className = "notice";
         status.textContent = "AI正在生成检索式...";
         try {
           const workspaceBefore = collectionWorkspace();
-          const queries = expand && workspaceBefore.publicSearchQueries?.length > 1 ? workspaceBefore.publicSearchQueries : await optimizePublicSearchQueries(topic, type, extra);
-          const executedBefore = expand ? (workspaceBefore.publicExecutedQueries || []) : [];
-          const query = expand ? queries.find((item) => !executedBefore.includes(item)) : queries[0];
-          if (!query) throw new Error("没有新的补充检索词，请调整补充检索要求后重新开始搜索");
-          status.textContent = `${expand ? "扩大搜索" : "开始搜索"}将消耗1次额度：${query}`;
+          const queries = await optimizePublicSearchQueries(topic, type, extra);
+          const query = queries[0];
+          if (!query) throw new Error("未能生成有效检索词，请调整补充检索要求后重试");
+          status.textContent = `本次只运行一个主检索词，将消耗1次额度：${query}`;
           beginAiWait("正在调用腾讯云联网搜索");
           let search;
           try {
@@ -6560,7 +6588,7 @@ ${limitMethodContext(recent, 5000)}
               count: 20
             });
           } finally { endAiWait(); }
-          const gathered = [...(expand ? workspaceBefore.publicSearchResults || [] : []), ...(search.results || [])];
+          const gathered = [...(search.results || [])];
           if (!gathered.length) throw new Error("没有找到可用结果");
           const expectedSite = publicSearchTypeMeta[type]?.site || "";
           const siteFiltered = expectedSite ? gathered.filter((result) => { try { return new URL(result.url).hostname.toLowerCase().endsWith(expectedSite); } catch (error) { return false; } }) : gathered;
@@ -6575,8 +6603,7 @@ ${limitMethodContext(recent, 5000)}
           const beforeSearch = collectionWorkspace();
           const seenUrls = new Set(beforeSearch.publicSearchSeenUrls || []);
           unique.forEach((result) => { if (result.url) seenUrls.add(result.url); });
-          const executedQueries = [...new Set([...executedBefore, query])];
-          saveCollectionWorkspace({ publicSearchType: type, publicSearchMatchMode: matchMode, publicSearchExtra: extra, publicSearchStart: start, publicSearchEnd: end, publicSearchCount: 20, publicSearchQueries: queries, publicExecutedQueries: executedQueries, publicSearchQuery: query, publicSearchResults: ranked, publicSearchCached: !!search.cached, publicSearchRequestId: search.requestId || "", publicSearchFailures: [], publicSearchQuota: search.quota || workspaceBefore.publicSearchQuota || null, publicSearchSeenUrls: [...seenUrls].slice(-500) });
+          saveCollectionWorkspace({ publicSearchType: type, publicSearchMatchMode: matchMode, publicSearchExtra: extra, publicSearchStart: start, publicSearchEnd: end, publicSearchCount: 20, publicSearchQueries: [query], publicExecutedQueries: [query], publicSearchQuery: query, publicSearchResults: ranked, publicSearchCached: !!search.cached, publicSearchRequestId: search.requestId || "", publicSearchFailures: [], publicSearchQuota: search.quota || workspaceBefore.publicSearchQuota || null, publicSearchSeenUrls: [...seenUrls].slice(-500) });
           setSubContent("collection", "public", publicTopicStudyHtml());
         } catch (error) {
           status.className = "notice warn";
@@ -6670,10 +6697,27 @@ ${limitMethodContext(recent, 5000)}
         const workspace = collectionWorkspace();
         workspace.publicItems = workspace.publicItems.map((item) => item.id === select.dataset.publicReview ? { ...item, reviewStatus: select.value } : item);
         saveCollectionWorkspace({ publicItems: workspace.publicItems });
+        const status = select.value === "confirmed" ? "confirmed" : select.value === "excluded" ? "excluded" : "pending";
+        const card = select.closest("[data-review-card]");
+        card?.classList.remove("pending", "confirmed", "excluded");
+        card?.classList.add(status);
+        const badge = card?.querySelector(".review-state");
+        if (badge) {
+          badge.className = `review-state ${status}`;
+          badge.textContent = status === "confirmed" ? "✓ 已纳入" : status === "excluded" ? "× 已排除" : "○ 待复核";
+        }
+        const confirmedCount = workspace.publicItems.filter((item) => item.reviewStatus === "confirmed").length;
+        const countNotice = document.getElementById("publicConfirmedCount");
+        if (countNotice) {
+          countNotice.className = `notice ${confirmedCount ? "ok" : "warn"}`;
+          countNotice.textContent = `已复核纳入${confirmedCount}条；AI编码只读取这些已纳入材料。`;
+        }
+        const codingButton = document.getElementById("generatePublicCodingBtn");
+        if (codingButton) codingButton.disabled = confirmedCount === 0;
       }));
       document.getElementById("generatePublicCodingBtn")?.addEventListener("click", async () => {
         const workspace = collectionWorkspace();
-        const items = workspace.publicItems.filter((item) => item.reviewStatus !== "excluded").slice(0, 30);
+        const items = workspace.publicItems.filter((item) => item.reviewStatus === "confirmed").slice(0, 30);
         const output = document.getElementById("publicCodingOutput");
         output.textContent = "正在整理匿名文本并编码...";
         try {
